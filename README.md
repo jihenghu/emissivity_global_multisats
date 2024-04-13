@@ -5,3 +5,6 @@ Basic code for global emissivity retrieval, features:
 - cloud: H8, MSG1/2, GOES-R
 - land only
 - clear sky
+
+log: 
+- last update 2024/2/25, ERA5 CDS quit service since then
