@@ -1,3 +1,16 @@
+##
+*.nc
+*.h5
+*.hdf
+*.hdf5
+*.txt
+*.log
+
+logs/
+filelists/
+
+
+
 # Prerequisites
 *.d
 
