@@ -214,7 +214,7 @@ PROGRAM main_clear_retrieve_landonly
 	GMI_L1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
 	H8_L2CLP_DIR = '/home/jihenghu/data00/data/AHI_L2CLP/'    
 	GEOS_L2_DIR = '/home/jihenghu/data00/data/GOES_R/'  
-	MSG_CLM_DIR='/home/jihenghu/data00/data/MSG_IODC_CLM/'
+	MSG_CLM_DIR='/home/jihenghu/data00/data/MSG_CLM/'
 	ERA5_DIR = '/home/jihenghu/data00/data/ERA5/'
     
 	!! OUTPUTs
@@ -269,8 +269,8 @@ PROGRAM main_clear_retrieve_landonly
 176	READ(file_unit,'(A)',end=886) GMI_FILENAME
 
    	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
-	EMISS_FILENAME=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO."//trim(GMI_Sufix)//".HDF5"
-	EMISS_TEXT=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO."//trim(GMI_Sufix)//".txt"
+	EMISS_FILENAME=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".txt"
  	!! decide to retrieve ??	
 	inquire(file=trim(EMISS_FILENAME), exist=EXISTSHDF)
 	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
@@ -367,8 +367,10 @@ PROGRAM main_clear_retrieve_landonly
 		!! ------------------------------------------------------------------------------------------------
 		! PRINT*, lon, lat
 		IF((lon.gt.80 .and. lon .le. 180).OR.((lon.ge.-180 .and. lon .lt. -160))) goto 2878   !! go to H-8		
-		IF(lon.gt.-156 .and. lon .lt. 6) GOTO 9642     !! goto GOESR		
-		IF(lon.gt.-12 .and. lon .lt. 113 ) GOTO  8847       !! goto MSG				
+		IF(lon.gt.-156 .and. lon .lt. 6) then
+			if (yyyymmdd>'20170501') GOTO 9642     !! goto GOESR	
+		end if
+		IF(lon.gt.-67.5 .and. lon .lt. 113 ) GOTO  8847       !! goto MSG				
 		GOTO 8404 !! goto Hell, no geostationary satellite mission region
 		
 	    !! ----------------------------------------------------------------------------------------------
@@ -738,19 +740,30 @@ PROGRAM main_clear_retrieve_landonly
 		!!  Instrument replace Warning: 
 		!!    2022.06.01, Meteosat-9 (45.5°E) replaced Meteosat-8(41.5° E) to provide data
 		!!    20220601 8:45(MSG1) -> 20220601 09:00(MSG2)
+		!!    20140101~ MSG3
 		!!----------------------------------------------------------------------------------------------
 ! MSG   WE have only one variable to deal with, ie., CLM		
 8847    CONTINUE 	
 
 				
-		IF(.NOT.(lon.gt.-30 .and. lon .lt. 130) ) GOTO 8404  !! no one want you here, middle pacific!!
-		IF(yyyymmdd<'20170201') THEN
+		IF(.NOT.(lon.gt.-67.5 .and. lon .lt. 130) ) GOTO 8404  !! no one want you here, middle pacific!!
+		IF(yyyymmdd<'20140101') THEN
 			Cloud_Flag(ipixel,iscan)=0
 			GOTO 8404
 		END IF
 
+
 		IF (yyyymmdd<'20220601') MSGSAT='MSG1'
 		IF (yyyymmdd>'20220601') MSGSAT='MSG2'
+		IF (yyyymmdd<'20170201') MSGSAT='MSG3'
+
+		IF (lon.lt.-20) then
+			IF (yyyymmdd>'20170201') then
+				MSGSAT='MSG3'
+			ENDIF
+		ENDIF
+		
+		
 		IF (yyyymmdd.eq.'20220601') THEN
 			IF(HH//MM15.lt.'0850') THEN
 				MSGSAT='MSG1'
@@ -763,7 +776,9 @@ PROGRAM main_clear_retrieve_landonly
 			Lambda0= 41.5
 		ELSE IF (MSGSAT.EQ.'MSG2') THEN
 			Lambda0= 45.5
-		ELSE 
+		ELSE IF (MSGSAT.EQ.'MSG3') THEN
+			Lambda0= 0
+		ELSE
 			PRINT*, "│  │  └── ERROR: Un—Specified MSG satellite: ", MSGSAT
 			Cloud_Flag(ipixel,iscan)=6
 			GOTO 8404 
@@ -787,13 +802,17 @@ PROGRAM main_clear_retrieve_landonly
 			INQUIRE(FILE=TRIM(MSG_FULLPATH), EXIST=EXISTS) 
 			! PRINT*,TRIM(MSG_FULLPATH)
 			IF (.NOT.EXISTS) THEN 
-				PRINT*,"│  │  ├── New MSG1/2 download needed"
+				PRINT*,"│  │  ├── New MSG1/2/3 download needed"
 				!! -----------------------------------------------------------------------------------
 				!! Call python script to download from EUMETSAT DC  :: pip(>3.7) install eumdac
 				!! -----------------------------------------------------------------------------------
+			  IF(MSGSAT.EQ.'MSG3') THEN
+				CALL SYSTEM("python3.9 subs/sub_download_msg3_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_CLM_DIR))			
+			  ELSE
 				CALL SYSTEM("python3.9 subs/sub_download_msg_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_CLM_DIR))			
+			  END IF
 			ELSE
-				PRINT*,"│  │  ├── OLD MSG1/2 Found, no download needed"
+				PRINT*,"│  │  ├── OLD MSG1/2/3 Found, no download needed"
 			END IF
 			!! --------------------------------------------------------------------------------------
 			!!	 CLOUD MASK :  Code table 4.217
@@ -1195,7 +1214,7 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(9,:)=-999.9
 	ENDWHERE
 		
-	WHERE(LST_land.le.10)
+	WHERE(LST_land.le.10 .or. LZA_land.lt.0)
 		Emissivity_land(1,:)=-999.9
 		Emissivity_land(2,:)=-999.9
 		Emissivity_land(3,:)=-999.9
