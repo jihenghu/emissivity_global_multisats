@@ -84,7 +84,7 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER(LEN=255) :: command
   CHARACTER(LEN=255) :: TB_Clouds_OUTDIR ,TB_Clouds_FILENAME,PWD
   CHARACTER(LEN=255) :: GMI_L1C_DIR,H8_L2CLP_DIR,GEOS_L2_DIR,MSG_CLM_DIR
-  INTEGER :: file_unit
+  INTEGER :: file_unit,text_unit
 !! read GMI Vars
   INTEGER :: nscan, npixel, nchannel
   REAL*4, DIMENSION(:,:,:), ALLOCATABLE :: TB_swath,Emissivity_swath
@@ -155,7 +155,7 @@ PROGRAM main_clear_retrieve_landonly
   INTEGER :: qaflag(16)
   
   INTEGER :: STATUS
-  LOGICAL :: EXISTS,FLAG_H8,FLAG_GOES,FLAG_MSG
+  LOGICAL :: EXISTS,EXISTSHDF,EXISTSTXT,FLAG_H8,FLAG_GOES,FLAG_MSG
   
 !! Local view zenith angle, LZA
   REAL, DIMENSION(:,:),ALLOCATABLE :: LZA_swath
@@ -192,10 +192,12 @@ PROGRAM main_clear_retrieve_landonly
   REAL, DIMENSION(:,:),ALLOCATABLE :: TB_land, Emissivity_land
   LOGICAL :: alive1, alive2, alive3
   !!! tmp
-
-
+  REAL, DIMENSION(:),ALLOCATABLE :: ScanTime_land,	LZA_land, Sea_land
+  INTEGER, DIMENSION(:),ALLOCATABLE :: Cloudflg_land
+  REAL, DIMENSION(:,:),ALLOCATABLE :: CFR_land,	Clear_land, Miss_land	
+			
   !! retreve 
-  CHARACTER*255 :: EMISS_OUT_DIR,EMISS_FILENAME
+  CHARACTER*255 :: EMISS_OUT_DIR,EMISS_FILENAME,EMISS_TEXT
   CHARACTER*7 :: samples
   INTEGER :: imonth
 
@@ -217,7 +219,8 @@ PROGRAM main_clear_retrieve_landonly
     
 	!! OUTPUTs
 	TB_Clouds_OUTDIR = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'    
-    EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_Emissivity_Clear_Landonly/'    
+    ! EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_Emissivity_Clear_Landonly/'    
+    EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
 	
 	REDO=.FALSE.  ! .True.!! redo retrieve or not?
 	
@@ -267,9 +270,11 @@ PROGRAM main_clear_retrieve_landonly
 
    	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
 	EMISS_FILENAME=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO."//trim(GMI_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO."//trim(GMI_Sufix)//".txt"
  	!! decide to retrieve ??	
-	inquire(file=trim(EMISS_FILENAME), exist=EXISTS)
-	IF (EXISTS .AND. (.NOT.REDO)) THEN
+	inquire(file=trim(EMISS_FILENAME), exist=EXISTSHDF)
+	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
+	IF ((EXISTSHDF.OR.EXISTSTXT) .AND. (.NOT.REDO)) THEN
 		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(GMI_Sufix)
 		GOTO 176
 	END IF
@@ -992,9 +997,12 @@ PROGRAM main_clear_retrieve_landonly
 	ALLOCATE(TB_land(nchannel,num_land))
 
 	ALLOCATE(Longitude_land(num_land),Latitude_land(num_land))
+	ALLOCATE(ScanTime_land(num_land),LZA_land(num_land),Sea_land(num_land),Cloudflg_land(num_land))
+	ALLOCATE(CFR_land(3,num_land),Clear_land(3,num_land),Miss_land(3,num_land))
+	
 		
-	ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
-	Emissivity_swath=-999.9		
+	! ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
+	! Emissivity_swath=-999.9		
 	ALLOCATE(Emissivity_land(nchannel,num_land))
 		Emissivity_land=0.0
 	
@@ -1022,6 +1030,14 @@ PROGRAM main_clear_retrieve_landonly
 			TB_land(:,iland)=TB_swath(:,ipixel,iscan)
 			Longitude_land(iland)=Longitude(ipixel,iscan)
 			Latitude_land(iland) =Latitude(ipixel,iscan)
+			ScanTime_land(iland)=ScanTime(iscan)
+			LZA_land(iland)=LZA_swath(ipixel,iscan)
+			Sea_land(iland)=Sea_Frac(ipixel,iscan)		
+			Cloudflg_land(iland)=Cloud_Flag(ipixel,iscan)
+			
+			CFR_land(:,iland)=CFR_swath(:,ipixel,iscan)
+			Clear_land(:,iland)=Clear_swath(:,ipixel,iscan)
+			Miss_land(:,iland)=Miss_swath(:,ipixel,iscan)
 			
 			stime=ScanTime(iscan)     !! 0.33 hr    23:45  
 			UTC_hr1=int(stime)        !!  0 hr      23      
@@ -1196,51 +1212,88 @@ PROGRAM main_clear_retrieve_landonly
 
 	!! reorgnize
 	
-	Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan),SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
-		LST_swath  = -999.9
-		T2m_swath  = -999.9
-		SnowC_swath= -999.9
-		SMC_swath	 = -999.9
+	! Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan),SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
+		! LST_swath  = -999.9
+		! T2m_swath  = -999.9
+		! SnowC_swath= -999.9
+		! SMC_swath	 = -999.9
 	
-	DO iland=1,num_land
-		iscan=scanid(iland)
-		ipixel=pixelid(iland)
-		Emissivity_swath(:,ipixel,iscan)=Emissivity_land(:,iland)
-		LST_swath(ipixel,iscan)  = LST_land(iland)
-		T2m_swath(ipixel,iscan)  = T2m_land(iland)
-		SnowC_swath(ipixel,iscan)= SnowC_land(iland)
-		SMC_swath(ipixel,iscan)	 = SMC_land(iland)
-	END DO
+	! DO iland=1,num_land
+		! iscan=scanid(iland)
+		! ipixel=pixelid(iland)
+		! Emissivity_swath(:,ipixel,iscan)=Emissivity_land(:,iland)
+		! LST_swath(ipixel,iscan)  = LST_land(iland)
+		! T2m_swath(ipixel,iscan)  = T2m_land(iland)
+		! SnowC_swath(ipixel,iscan)= SnowC_land(iland)
+		! SMC_swath(ipixel,iscan)	 = SMC_land(iland)
+	! END DO
 
 
 
-	WHERE(Miss_swath(1,:,:).ge.99)
-		Emissivity_swath(1,:,:)=-999.9
-		Emissivity_swath(2,:,:)=-999.9
-	ENDWHERE
+	! WHERE(Miss_swath(1,:,:).ge.99)
+		! Emissivity_swath(1,:,:)=-999.9
+		! Emissivity_swath(2,:,:)=-999.9
+	! ENDWHERE
 	
-	WHERE(Miss_swath(2,:,:).ge.99)	
-		Emissivity_swath(3,:,:)=-999.9
-		Emissivity_swath(4,:,:)=-999.9
-		Emissivity_swath(5,:,:)=-999.9
-		Emissivity_swath(6,:,:)=-999.9
-		Emissivity_swath(7,:,:)=-999.9
-	ENDWHERE
+	! WHERE(Miss_swath(2,:,:).ge.99)	
+		! Emissivity_swath(3,:,:)=-999.9
+		! Emissivity_swath(4,:,:)=-999.9
+		! Emissivity_swath(5,:,:)=-999.9
+		! Emissivity_swath(6,:,:)=-999.9
+		! Emissivity_swath(7,:,:)=-999.9
+	! ENDWHERE
 	
-	WHERE(Miss_swath(3,:,:).ge.99)
-		Emissivity_swath(8,:,:)=-999.9
-		Emissivity_swath(9,:,:)=-999.9
-	ENDWHERE
+	! WHERE(Miss_swath(3,:,:).ge.99)
+		! Emissivity_swath(8,:,:)=-999.9
+		! Emissivity_swath(9,:,:)=-999.9
+	! ENDWHERE
 		
   ! --------------------------------------------------------------------------
   ! 5. output Retrieve result
   ! --------------------------------------------------------------------------
+	! output to ascci text
+	
+	WHERE(Miss_land(1,:).ge.99)
+		Emissivity_land(1,:)=-999.9
+		Emissivity_land(2,:)=-999.9
+	ENDWHERE
+	
+	WHERE(Miss_land(2,:).ge.99)	
+		Emissivity_land(3,:)=-999.9
+		Emissivity_land(4,:)=-999.9
+		Emissivity_land(5,:)=-999.9
+		Emissivity_land(6,:)=-999.9
+		Emissivity_land(7,:)=-999.9
+	ENDWHERE
+	
+	WHERE(Miss_land(3,:).ge.99)
+		Emissivity_land(8,:)=-999.9
+		Emissivity_land(9,:)=-999.9
+	ENDWHERE
+	
+	open(NEWUNIT=text_unit,file=trim(adjustL(EMISS_TEXT)))
+	DO iland=1,num_land
+		
+		iscan=scanid(iland)
+		ipixel=pixelid(iland)
 
-	CALL write_emiss_hdf5(trim(adjustL(EMISS_FILENAME)),nchannel,npixel,nscan, &
-			Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
-			LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
-			LZA_swath,CFR_swath,Clear_swath,&
-			Sea_Frac,Cloud_Flag,Miss_swath,status)
+		write(text_unit,505) nscan,npixel,iscan,ipixel,Longitude_land(iland),Latitude_land(iland),&
+			ScanTime_land(iland),Emissivity_land(:,iland),TB_land(:,iland),&
+			LST_land(iland),T2m_land(iland),SnowC_land(iland),SMC_land(iland), &
+			LZA_land(iland),CFR_land(:,iland),Clear_land(:,iland),Miss_land(:,iland),&
+			Sea_land(iland),Cloudflg_land(iland)
+	
+	END DO	
+
+505 format(4I6, 3f10.4, 18f10.4, 5f10.4, 10f10.4, I6)
+	
+	close(text_unit)
+	
+	! CALL write_emiss_hdf5(trim(adjustL(EMISS_FILENAME)),nchannel,npixel,nscan, &
+			! Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
+			! LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
+			! LZA_swath,CFR_swath,Clear_swath,&
+			! Sea_Frac,Cloud_Flag,Miss_swath,status)
 	
 	IF(status/=0) THEN
 		PRINT*,"└── Write emissivity HDF error : ",trim(adjustL(EMISS_FILENAME))
@@ -1252,8 +1305,8 @@ PROGRAM main_clear_retrieve_landonly
   ! 6. free memory
   ! --------------------------------------------------------------------------	
 	! Deallocate(ERA5)
-	DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
-	DEALLOCATE(Emissivity_swath)
+	! DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
+	! DEALLOCATE(Emissivity_swath)
 	DEALLOCATE(pixelid,scanid)
 	
 	DEALLOCATE(LST_land, Psrf_land, T2m_land, SnowC_land, SMC_land)	
@@ -1262,6 +1315,9 @@ PROGRAM main_clear_retrieve_landonly
 	DEALLOCATE(Emissivity_land)
 	DEALLOCATE(TB_land)
 	DEALLOCATE(Longitude_land,Latitude_land)
+
+	DEALLOCATE(ScanTime_land,LZA_land,Sea_land,Cloudflg_land)
+	DEALLOCATE(CFR_land,Clear_land,Miss_land)
 	
 2333 Continue
 		
