@@ -75,7 +75,7 @@ SUBROUTINE read_GOES_CLM(yyyymmdd,HHMM,GEOS_L2_DIR,CLM_GOES,AG)
 	Integer status,ncid,varid
 	Character*255 :: filename
 	AG=.TRUE.	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
@@ -99,7 +99,7 @@ SUBROUTINE read_GOES_PHASE(yyyymmdd,HHMM,GEOS_L2_DIR,PHASE_GOES,AG)
 	Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-ACTPF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
@@ -124,7 +124,7 @@ SUBROUTINE read_GOES_CER(yyyymmdd,HHMM,GEOS_L2_DIR,CER_GOES,AG)
 	Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-CPSF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
@@ -154,7 +154,7 @@ SUBROUTINE read_GOES_COT(yyyymmdd,HHMM,GEOS_L2_DIR,COT_GOES,AG)
 	Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-CODF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
@@ -185,7 +185,7 @@ SUBROUTINE read_GOES_CTH(yyyymmdd,HHMM,GEOS_L2_DIR,CTH_GOES,AG)
 	Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-ACHAF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
@@ -215,7 +215,7 @@ SUBROUTINE read_GOES_DQF1(yyyymmdd,HHMM,GEOS_L2_DIR,DQF_GOES,AG)
 	Integer status,ncid,varid
 	Character*255 :: filename
 	AG=.TRUE.	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-CPSF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
@@ -238,7 +238,7 @@ SUBROUTINE read_GOES_DQF2(yyyymmdd,HHMM,GEOS_L2_DIR,DQF_GOES,AG)
 	Integer status,ncid,varid
 	Character*255 :: filename
 	AG=.TRUE.	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
+	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
 	"/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
     status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	

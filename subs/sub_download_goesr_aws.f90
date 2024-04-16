@@ -145,7 +145,7 @@ SUBROUTINE download_GOESR_AWS_all(yyyymmdd,HH,GEOS_L2_DIR)
 !! ACM Clearsky MASK 
     command = "aws s3 cp --quiet --recursive --no-sign-request &
 			 s3://noaa-goes16/ABI-L2-ACMF/"//yyyymmdd(1:4)//"/"//DOY//"/ "&
-			 //trim(GEOS_L2_DIR)//"/"//yyyymmdd//"/"
+			 //trim(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd//"/"
     CALL SYSTEM(command, status)
   
     ! Check the exit status
@@ -160,7 +160,7 @@ SUBROUTINE download_GOESR_AWS_all(yyyymmdd,HH,GEOS_L2_DIR)
 		do im=0,50,10		
 		WRite(MM0,"(i0.2)") im
 		WRite(HH0,"(i0.2)") ih
-	CALL system("cd "//trim(GEOS_L2_DIR)//"/"//yyyymmdd//"/"//HH0//&
+	CALL system("cd "//trim(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd//"/"//HH0//&
 		" ; mv OR_ABI-L2-ACMF-M6_G16_s"//yyyymmdd(1:4)//DOY//HH0//MM0//"???_e*_c*.nc &
 		../OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HH0//MM0//".NC")
 			

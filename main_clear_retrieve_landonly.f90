@@ -17,7 +17,7 @@
 !!    The clouds come from three GeoSats that cover the whole globe except for high-latitudes:
 !!		- Himawari-8/AHI over the Pacific Ocean 
 !!	 	- GOES-16/ABI over the America
-!!	 	- MSG-1&2/SERV over the Indian Ocean
+!!	 	- MSG-1&2&3/SERV over the Indian Ocean
 !!  - Collocate tb-cloud to ERA5 profiles and LST;
 !!  - Call RTTOV V13.2 to retrieve multichannel allsky emissivity:
 !! 	  Use the direct retrieving scheme porposed by (Baord et al., 2016), considering clearsky 
@@ -38,6 +38,7 @@
 !! H-8 AHI L2CLP : 2015.07.04 - present, every 10-min  
 !! GOES-R ABI L2 Cloud : AWS (2019.339-present, 10-min)  CLASS/NCEI(2017.06.08-present) “hard”
 !! MSG1/2 indian sea : 2017.2.1 - present  ONLY Cloud Mask , 15-min 
+!! MSG3 0^oE : 2014.2.1 - present  ONLY Cloud Mask , 15-min 
 !! ERA5: 1-hour, 0.25-degree, 37-layer
 !! ============================================================================================
 
@@ -49,6 +50,7 @@
  INCLUDE 'subs/sub_download_ahi_l2c.f90'
  INCLUDE 'subs/sub_download_goesr_aws.f90'
  ! python 'subs/sub_download_msg_clm.py'
+ ! python 'subs/sub_download_msg3_clm.py'
  ! I/O
  INCLUDE 'subs/sub_read_gmi_l1c_vars.f90'
  INCLUDE 'subs/sub_read_land_sea_mask.f90'
@@ -82,8 +84,8 @@ PROGRAM main_clear_retrieve_landonly
   Implicit none
   CHARACTER(8) :: yyyymmdd
   CHARACTER(LEN=255) :: command
-  CHARACTER(LEN=255) :: TB_Clouds_OUTDIR ,TB_Clouds_FILENAME,PWD
-  CHARACTER(LEN=255) :: GMI_L1C_DIR,H8_L2CLP_DIR,GEOS_L2_DIR,MSG_CLM_DIR
+  CHARACTER(LEN=255) :: TB_Clouds_OUT ,PWD
+  CHARACTER(LEN=255) :: GMIL1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
   INTEGER :: file_unit,text_unit
 !! read GMI Vars
   INTEGER :: nscan, npixel, nchannel
@@ -117,7 +119,7 @@ PROGRAM main_clear_retrieve_landonly
 !! GOESR 
   REAL    :: xdeg,ydeg  !! rad
 
- 
+  CHARACTER*2 :: Mode
   INTEGER, DIMENSION(5424,5424)	:: CLM_GOES, DQF_CLM
 
   LOGICAL 						:: GOES_IN, A1, A2, A3, A4, A5, A6,A7
@@ -211,21 +213,21 @@ PROGRAM main_clear_retrieve_landonly
 	PWD='/home/jihenghu/emissivity_research/retrieve_gmi_clear_opt/' 
 	
 	!! Directory to save GMI_L1C HDF files
-	GMI_L1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
-	H8_L2CLP_DIR = '/home/jihenghu/data00/data/AHI_L2CLP/'    
-	GEOS_L2_DIR = '/home/jihenghu/data00/data/GOES_R/'  
-	MSG_CLM_DIR='/home/jihenghu/data00/data/MSG_CLM/'
+	GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
+	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2CLP/'    
+	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
+	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
 	ERA5_DIR = '/home/jihenghu/data00/data/ERA5/'
     
 	!! OUTPUTs
-	TB_Clouds_OUTDIR = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'    
+	TB_Clouds_OUT = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'    
     ! EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_Emissivity_Clear_Landonly/'    
     EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
 	
 	REDO=.FALSE.  ! .True.!! redo retrieve or not?
 	
 ! ==================================================================================================
-	CALL system("mkdir -p  "//trim(TB_Clouds_OUTDIR))
+	CALL system("mkdir -p  "//trim(TB_Clouds_OUT))
 	CALL system("mkdir -p  "//trim(EMISS_OUT_DIR))
 	CALL system("mkdir -p  "//trim(ERA5_DIR))
 
@@ -242,7 +244,7 @@ PROGRAM main_clear_retrieve_landonly
     STOP
   END IF  
   
-  CALL system("mkdir -p  "//trim(TB_Clouds_OUTDIR)//"/"//yyyymmdd)
+  CALL system("mkdir -p  "//trim(TB_Clouds_OUT)//"/"//yyyymmdd)
   CALL system("mkdir -p  "//trim(EMISS_OUT_DIR)//"/"//yyyymmdd)
   
 ! ==================================================================================================
@@ -250,10 +252,10 @@ PROGRAM main_clear_retrieve_landonly
 ! ==================================================================================================	 
 
   PRINT*,"Downloading GMI files of the day ......"
-  CALL download_GMI_L1C(yyyymmdd,GMI_L1C_DIR)
+  CALL download_GMI_L1C(yyyymmdd,GMIL1C_DIR)
   
   ! Call the ls command to list HDF files in the directory
-  command ='ls '//TRIM(GMI_L1C_DIR)//yyyymmdd(1:4)//"/"//yyyymmdd(5:6)//yyyymmdd(7:8)//'/*.HDF5'&
+  command ='ls '//TRIM(GMIL1C_DIR)//yyyymmdd(1:4)//"/"//yyyymmdd(5:6)//yyyymmdd(7:8)//'/*.HDF5'&
 			// '> filelists/gmi_filelist_'//yyyymmdd//'.txt' 
 
   CALL SYSTEM(command)
@@ -392,7 +394,7 @@ PROGRAM main_clear_retrieve_landonly
 		IF (trim(AHI_FILENAME) .ne. trim(record)) THEN 
 			record=AHI_FILENAME
 
-			AHI_FULLPATH=trim(H8_L2CLP_DIR)//yyyymmdd//'/'//HH//'/'//trim(AHI_FILENAME)
+			AHI_FULLPATH=trim(HIMA_DIR)//yyyymmdd//'/'//HH//'/'//trim(AHI_FILENAME)
 			inquire(file=trim(AHI_FULLPATH), exist=EXISTS) !! 去指定文件夹寻找
 
 			!! --------------------------------------------------------------------------
@@ -400,7 +402,7 @@ PROGRAM main_clear_retrieve_landonly
 			!! --------------------------------------------------------------------------
 			if (.not.EXISTS) then !!! 其实不用检查，wget -c -N 会自动给检查	
 				!! Not found, download
-				CALL download_AHI_L2CLP(yyyymmdd,HH,AHI_FILENAME,H8_L2CLP_DIR,status)
+				CALL download_AHI_L2CLP(yyyymmdd,HH,AHI_FILENAME,HIMA_DIR,status)
 				
 				!! error download, record the lost				
 				if(status.ne.0) then
@@ -500,7 +502,7 @@ PROGRAM main_clear_retrieve_landonly
 		
 		!!----------------------------------------------------------------------------------------------
 		!!  GOES-R Domain  
-		!!        NOTE: MSG data before 2020 is extremely hard to access upon order, 
+		!!        NOTE: GOESR data before 2020 can only be accessed upon order on NOAA CLASS, 
 		!!              AND one should be careful of the 15-min mode3 before 20190402	
 		!!        ONLY GOESR .gt. 20200101 from  AWS archive USED HERE!!!
 		!! 		FullDisk mode06 ( 10-min interval: 00,10,20,30,40,50 same as Himawari-8 )
@@ -509,7 +511,17 @@ PROGRAM main_clear_retrieve_landonly
 		!!----------------------------------------------------------------------------------------------
 ! GOES
 9642    continue 
-
+			
+		IF(yyyymmdd.gt.'20190402') Mode='M6'
+		IF(yyyymmdd.lt.'20190402') Mode='M3'
+		IF(yyyymmdd.eq.'20190402') then
+			if (MM.lt.'16')	then
+				Mode='M3'
+			else
+				Mode='M6'
+			end if
+		END IF
+		
 		IF(.NOT.(lon.gt.-156 .and. lon .lt. 6)) GOTO 8847		
 	    IF (yyyymmdd<'20200101') THEN
 			Cloud_Flag(ipixel,iscan)=5
@@ -532,16 +544,22 @@ PROGRAM main_clear_retrieve_landonly
 		IF (TRIM(GOES_CUR_STMAP).NE. TRIM(GOES_REC_STMAP)) THEN  !! NEW file	
 			GOES_REC_STMAP=GOES_CUR_STMAP
 			
-			GOES_FILENAME=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd//&
-					"/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HH//MM//".NC"
+			GOES_FILENAME=TRIM(GEOS_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd//&
+					"/OR_ABI-L2-ACMF-"//Mode//"_G16_"//yyyymmdd//"_"//HH//MM//".NC"
 			INQUIRE(FILE=TRIM(GOES_FILENAME), EXIST=EXISTS) !! 去指定文件夹寻找
-			IF (.NOT.EXISTS) THEN 			
-				!! ---------------------------------------------------------------------
-				!!    CALL Sub to download from Amazon Web Services S3 Cloud Bucket	
-				!! ---------------------------------------------------------------------
-				print*, '│  │  ├── GOES-R files downloading ......'				
-
-				CALL download_GOESR_AWS_all(yyyymmdd,HH,GEOS_L2_DIR)  !!! download for all day
+			IF (.NOT.EXISTS) THEN 
+				IF(yyyymmdd.gt.'20191231') THEN
+					!! ---------------------------------------------------------------------
+					!!    CALL Sub to download from Amazon Web Services S3 Cloud Bucket	
+					!! ---------------------------------------------------------------------
+					print*, '│  │  ├── GOES-R files downloading ......'				
+					CALL download_GOESR_AWS_all(yyyymmdd,HH,GEOS_DIR)  !!! download for all day
+				ELSE
+					PRINT*,"│  │  └── GOES file notfound, skip ......"
+					GOES_MISS_STMAP=GOES_CUR_STMAP
+					Cloud_Flag(ipixel,iscan)=5
+					GOTO 8847				
+				ENDIF
 			ELSE 
 				print*, '│  │  ├── GOES-R file aready exists, no downloading needed'
 			END IF
@@ -550,7 +568,7 @@ PROGRAM main_clear_retrieve_landonly
 			!!  Cloud Mask DIMENSION(5424,5424)
 			!!	-1: NaN; 0: clear;  1:cloudy
 			!! -------------------------------------------------------------------------	
-			CALL read_GOES_CLM(yyyymmdd,HH//MM,GEOS_L2_DIR,CLM_GOES,A1)
+			CALL read_GOES_CLM(yyyymmdd,HH//MM,GEOS_DIR,CLM_GOES,A1)
 				! print*,MinVal(CLM_GOES),MAXVAL(CLM_GOES)  
 				! print*,CLM_GOES(:20,1)
 
@@ -567,7 +585,7 @@ PROGRAM main_clear_retrieve_landonly
 			!!    5 degraded_due_to_failed_band_2_tests_qf 
 			!!    6 degraded_due_to_other_bad_bands_qf
 			!! --------------------------------------------------------------------------
-			CALL read_GOES_DQF2(yyyymmdd,HH//MM,GEOS_L2_DIR,DQF_CLM,A7)  	  
+			CALL read_GOES_DQF2(yyyymmdd,HH//MM,GEOS_DIR,DQF_CLM,A7)  	  
 				! PRINT*,MinVal(DQF_CLM),MAXVAL(DQF_CLM)
 
 			IF(.NOT.(A1.AND.A7)) THEN  !! SOME file MISSING
@@ -740,13 +758,15 @@ PROGRAM main_clear_retrieve_landonly
 		!!  Instrument replace Warning: 
 		!!    2022.06.01, Meteosat-9 (45.5°E) replaced Meteosat-8(41.5° E) to provide data
 		!!    20220601 8:45(MSG1) -> 20220601 09:00(MSG2)
-		!!    20140101~ MSG3
+		!!    
+		!!   2018-02-20 (09:00) 	MSG4				
+		!!   2018-02-20 (08:45) 	MSG3		
 		!!----------------------------------------------------------------------------------------------
 ! MSG   WE have only one variable to deal with, ie., CLM		
 8847    CONTINUE 	
 
 				
-		IF(.NOT.(lon.gt.-67.5 .and. lon .lt. 130) ) GOTO 8404  !! no one want you here, middle pacific!!
+		IF(.NOT.(lon.gt.-67.5 .and. lon .lt. 113) ) GOTO 8404  !! out of MSG domain
 		IF(yyyymmdd<'20140101') THEN
 			Cloud_Flag(ipixel,iscan)=0
 			GOTO 8404
@@ -757,13 +777,12 @@ PROGRAM main_clear_retrieve_landonly
 		IF (yyyymmdd>'20220601') MSGSAT='MSG2'
 		IF (yyyymmdd<'20170201') MSGSAT='MSG3'
 
-		IF (lon.lt.-20) then
-			IF (yyyymmdd>'20170201') then
+		IF (lon.lt.-20 .and. lon.gt.-67) then
+			IF (yyyymmdd>'20170201'.and. yyyymmdd<'20170608') then
 				MSGSAT='MSG3'
 			ENDIF
 		ENDIF
-		
-		
+			
 		IF (yyyymmdd.eq.'20220601') THEN
 			IF(HH//MM15.lt.'0850') THEN
 				MSGSAT='MSG1'
@@ -771,12 +790,14 @@ PROGRAM main_clear_retrieve_landonly
 				MSGSAT='MSG2'
 			END IF
 		END IF
-
+		
 		IF (MSGSAT.EQ.'MSG1') then
 			Lambda0= 41.5
 		ELSE IF (MSGSAT.EQ.'MSG2') THEN
 			Lambda0= 45.5
 		ELSE IF (MSGSAT.EQ.'MSG3') THEN
+			Lambda0= 0
+		ELSE IF (MSGSAT.EQ.'MSG4') THEN
 			Lambda0= 0
 		ELSE
 			PRINT*, "│  │  └── ERROR: Un—Specified MSG satellite: ", MSGSAT
@@ -797,7 +818,7 @@ PROGRAM main_clear_retrieve_landonly
 			REC_MSG_STAMP=CURRENT_MSG_STAMP
 			
 			!!! search the file to open
-			MSG_FULLPATH=TRIM(MSG_CLM_DIR)//yyyymmdd//'/'//MSGSAT// &
+			MSG_FULLPATH=TRIM(MSG_DIR)//yyyymmdd//'/'//MSGSAT// &
 					'-SEVI-MSGCLMK-0100-0100-'//yyyymmdd//HH//MM15//'00.000000000Z-NA.grb'
 			INQUIRE(FILE=TRIM(MSG_FULLPATH), EXIST=EXISTS) 
 			! PRINT*,TRIM(MSG_FULLPATH)
@@ -807,9 +828,9 @@ PROGRAM main_clear_retrieve_landonly
 				!! Call python script to download from EUMETSAT DC  :: pip(>3.7) install eumdac
 				!! -----------------------------------------------------------------------------------
 			  IF(MSGSAT.EQ.'MSG3') THEN
-				CALL SYSTEM("python3.9 subs/sub_download_msg3_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_CLM_DIR))			
+				CALL SYSTEM("python3.9 subs/sub_download_msg3_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_DIR))			
 			  ELSE
-				CALL SYSTEM("python3.9 subs/sub_download_msg_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_CLM_DIR))			
+				CALL SYSTEM("python3.9 subs/sub_download_msg_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_DIR))			
 			  END IF
 			ELSE
 				PRINT*,"│  │  ├── OLD MSG1/2/3 Found, no download needed"
@@ -1303,7 +1324,7 @@ PROGRAM main_clear_retrieve_landonly
 			Sea_land(iland),Cloudflg_land(iland)
 	
 	END DO	
-
+	PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_TEXT))
 505 format(4I6, 3f10.4, 18f10.4, 5f10.4, 10f10.4, I6)
 	
 	close(text_unit)
@@ -1314,11 +1335,11 @@ PROGRAM main_clear_retrieve_landonly
 			! LZA_swath,CFR_swath,Clear_swath,&
 			! Sea_Frac,Cloud_Flag,Miss_swath,status)
 	
-	IF(status/=0) THEN
-		PRINT*,"└── Write emissivity HDF error : ",trim(adjustL(EMISS_FILENAME))
-		Stop
-	ENDIF		 
-	PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_FILENAME))
+	! IF(status/=0) THEN
+		! PRINT*,"└── Write emissivity HDF error : ",trim(adjustL(EMISS_FILENAME))
+		! Stop
+	! ENDIF		 
+	! PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_FILENAME))
 	
   ! --------------------------------------------------------------------------
   ! 6. free memory
@@ -1354,8 +1375,8 @@ PROGRAM main_clear_retrieve_landonly
 	! Close the filelist
 	CLOSE(file_unit)
 	
-	!! remove goesr
-	! call system("cd "//trim(GEOS_L2_DIR)//"/"//yyyymmdd//" ; rm -r *")
+	!! remove goesr;; becareful, not recommended
+	! call system("cd "//trim(GEOS_DIR)//"/"//yyyymmdd//" ; rm -r *")
 
 END PROGRAM main_clear_retrieve_landonly
 
