@@ -223,8 +223,8 @@ PROGRAM main_clear_retrieve_landonly
 	TB_Clouds_OUT = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'     
     EMISS_OUTDIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
 	
-	REDO=.True.  ! .True.!! redo retrieve or not?
-	HDF5=.True.  ! .True.!! Output HDF orbits? Ascii format is mandatory
+	REDO=.False.  ! .True.!! redo retrieve or not?
+	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
 	CALL system("mkdir -p  "//trim(TB_Clouds_OUT))
