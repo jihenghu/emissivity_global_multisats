@@ -199,20 +199,20 @@ PROGRAM main_clear_retrieve_landonly
   REAL, DIMENSION(:,:),ALLOCATABLE :: CFR_land,	Clear_land, Miss_land	
 			
   !! retreve 
-  CHARACTER*255 :: EMISS_OUT_DIR,EMISS_FILENAME,EMISS_TEXT
+  CHARACTER*255 :: EMISS_OUTDIR,EMISS_HDF5,EMISS_TEXT
   CHARACTER*7 :: samples
   INTEGER :: imonth
 
   Integer :: num_land,iland
   
-  logical :: REDO
+  logical :: REDO, HDF5
 ! ==================================================================================================
 !	 1. SET UP VARIABLES
 ! ==================================================================================================	 
 	!! present working Directory !! Very Important
 	PWD='/home/jihenghu/emissivity_research/retrieve_gmi_clear_opt/' 
 	
-	!! Directory to save GMI_L1C HDF files
+	!! Directory to save GMI_L1C HDF5 files
 	GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
 	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2CLP/'    
 	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
@@ -220,15 +220,15 @@ PROGRAM main_clear_retrieve_landonly
 	ERA5_DIR = '/home/jihenghu/data00/data/ERA5/'
     
 	!! OUTPUTs
-	TB_Clouds_OUT = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'    
-    ! EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_Emissivity_Clear_Landonly/'    
-    EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
+	TB_Clouds_OUT = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'     
+    EMISS_OUTDIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
 	
-	REDO=.FALSE.  ! .True.!! redo retrieve or not?
+	REDO=.True.  ! .True.!! redo retrieve or not?
+	HDF5=.True.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
 	CALL system("mkdir -p  "//trim(TB_Clouds_OUT))
-	CALL system("mkdir -p  "//trim(EMISS_OUT_DIR))
+	CALL system("mkdir -p  "//trim(EMISS_OUTDIR))
 	CALL system("mkdir -p  "//trim(ERA5_DIR))
 
   ! Check if a command-line argument is provided
@@ -245,7 +245,7 @@ PROGRAM main_clear_retrieve_landonly
   END IF  
   
   CALL system("mkdir -p  "//trim(TB_Clouds_OUT)//"/"//yyyymmdd)
-  CALL system("mkdir -p  "//trim(EMISS_OUT_DIR)//"/"//yyyymmdd)
+  CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd)
   
 ! ==================================================================================================
 ! 	download GMI Files
@@ -254,7 +254,7 @@ PROGRAM main_clear_retrieve_landonly
   PRINT*,"Downloading GMI files of the day ......"
   CALL download_GMI_L1C(yyyymmdd,GMIL1C_DIR)
   
-  ! Call the ls command to list HDF files in the directory
+  ! Call the ls command to list HDF5 files in the directory
   command ='ls '//TRIM(GMIL1C_DIR)//yyyymmdd(1:4)//"/"//yyyymmdd(5:6)//yyyymmdd(7:8)//'/*.HDF5'&
 			// '> filelists/gmi_filelist_'//yyyymmdd//'.txt' 
 
@@ -263,7 +263,6 @@ PROGRAM main_clear_retrieve_landonly
   ! Open a unit for reading the ls command output
   OPEN(NEWUNIT=file_unit, FILE='filelists/gmi_filelist_'//yyyymmdd//'.txt')
 
-
 !! ==================================================================================================
 !!  Loop over GMI File to retrieve
 !! ==================================================================================================
@@ -271,10 +270,10 @@ PROGRAM main_clear_retrieve_landonly
 176	READ(file_unit,'(A)',end=886) GMI_FILENAME
 
    	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
-	EMISS_FILENAME=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".HDF5"
-	EMISS_TEXT=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".txt"
+	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".txt"
  	!! decide to retrieve ??	
-	inquire(file=trim(EMISS_FILENAME), exist=EXISTSHDF)
+	inquire(file=trim(EMISS_HDF5), exist=EXISTSHDF)
 	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
 	IF ((EXISTSHDF.OR.EXISTSTXT) .AND. (.NOT.REDO)) THEN
 		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(GMI_Sufix)
@@ -285,7 +284,7 @@ PROGRAM main_clear_retrieve_landonly
    !!		  read GMI Variables                   
    !! --------------------------------------------------------------------------------------------------	
     PRINT *, '├──> Read GMI file: 1C.GPM.GMI.XCAL2016-C.'//trim(GMI_Sufix)//".******.HDF5" 
-	! get HDF file Dimension
+	! get HDF5 file Dimension
 	CALL get_GMI_primary_dims(GMI_FILENAME,nscan,npixel,nchannel)
 
 	! Call the subroutine to read data	
@@ -1030,7 +1029,7 @@ PROGRAM main_clear_retrieve_landonly
 	!! operate in 1D londonly pixel
 	
 	ALLOCATE(pixelid(num_land),scanid(num_land) )		
-	ALLOCATE(LST_land(num_land), Psrf_land(num_land), T2m_land(num_land), SnowC_land(num_land), SMC_land(num_land) )	
+	ALLOCATE(LST_land(num_land), Psrf_land(num_land), T2m_land(num_land), SnowC_land(num_land), SMC_land(num_land))	
 
 	ALLOCATE(Vapor_land(nlevel,num_land),AirTemp_land(nlevel,num_land))!,rh(nlevel,npixel,nscan)		
 
@@ -1040,9 +1039,6 @@ PROGRAM main_clear_retrieve_landonly
 	ALLOCATE(ScanTime_land(num_land),LZA_land(num_land),Sea_land(num_land),Cloudflg_land(num_land))
 	ALLOCATE(CFR_land(3,num_land),Clear_land(3,num_land),Miss_land(3,num_land))
 	
-		
-	! ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
-	! Emissivity_swath=-999.9		
 	ALLOCATE(Emissivity_land(nchannel,num_land))
 		Emissivity_land=0.0
 	
@@ -1196,9 +1192,6 @@ PROGRAM main_clear_retrieve_landonly
 	print*, "├──RTTOV retrieve begining, total samples= "//samples
 	! channel 10.65 
 	print*, "├──── Start RTTOV retrieve Channel 1-2 ......."
-	
-	! print*,maxVal(Emissivity_swath),minVal(Emissivity_swath)
-	! print*,maxVal(Emissivity_land),minVal(Emissivity_land)
 
 	call rttov_retrieve_gmi_emiss_clearsky(imonth,nlevel,num_land,2,52.8,(/1,2/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
@@ -1250,44 +1243,47 @@ PROGRAM main_clear_retrieve_landonly
 
 	WHERE(Emissivity_land.eq.-1 ) Emissivity_land=-999.9
 
-	!! reorgnize
-	
-	! Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan),SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
-		! LST_swath  = -999.9
-		! T2m_swath  = -999.9
-		! SnowC_swath= -999.9
-		! SMC_swath	 = -999.9
-	
-	! DO iland=1,num_land
-		! iscan=scanid(iland)
-		! ipixel=pixelid(iland)
-		! Emissivity_swath(:,ipixel,iscan)=Emissivity_land(:,iland)
-		! LST_swath(ipixel,iscan)  = LST_land(iland)
-		! T2m_swath(ipixel,iscan)  = T2m_land(iland)
-		! SnowC_swath(ipixel,iscan)= SnowC_land(iland)
-		! SMC_swath(ipixel,iscan)	 = SMC_land(iland)
-	! END DO
+	!! reorgnize for HDF5 output
+	IF (HDF5) THEN
+		ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
+		Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan))
+		Allocate(SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
+			LST_swath  = -999.9
+			T2m_swath  = -999.9
+			SnowC_swath= -999.9
+			SMC_swath  = -999.9
+			Emissivity_swath=-999.9	
+			
+		DO iland=1,num_land
+			iscan=scanid(iland)
+			ipixel=pixelid(iland)
+			Emissivity_swath(:,ipixel,iscan)=Emissivity_land(:,iland)
+			LST_swath(ipixel,iscan)  = LST_land(iland)
+			T2m_swath(ipixel,iscan)  = T2m_land(iland)
+			SnowC_swath(ipixel,iscan)= SnowC_land(iland)
+			SMC_swath(ipixel,iscan)	 = SMC_land(iland)
+		END DO
 
 
 
-	! WHERE(Miss_swath(1,:,:).ge.99)
-		! Emissivity_swath(1,:,:)=-999.9
-		! Emissivity_swath(2,:,:)=-999.9
-	! ENDWHERE
-	
-	! WHERE(Miss_swath(2,:,:).ge.99)	
-		! Emissivity_swath(3,:,:)=-999.9
-		! Emissivity_swath(4,:,:)=-999.9
-		! Emissivity_swath(5,:,:)=-999.9
-		! Emissivity_swath(6,:,:)=-999.9
-		! Emissivity_swath(7,:,:)=-999.9
-	! ENDWHERE
-	
-	! WHERE(Miss_swath(3,:,:).ge.99)
-		! Emissivity_swath(8,:,:)=-999.9
-		! Emissivity_swath(9,:,:)=-999.9
-	! ENDWHERE
+		WHERE(Miss_swath(1,:,:).ge.99)
+			Emissivity_swath(1,:,:)=-999.9
+			Emissivity_swath(2,:,:)=-999.9
+		ENDWHERE
 		
+		WHERE(Miss_swath(2,:,:).ge.99)	
+			Emissivity_swath(3,:,:)=-999.9
+			Emissivity_swath(4,:,:)=-999.9
+			Emissivity_swath(5,:,:)=-999.9
+			Emissivity_swath(6,:,:)=-999.9
+			Emissivity_swath(7,:,:)=-999.9
+		ENDWHERE
+		
+		WHERE(Miss_swath(3,:,:).ge.99)
+			Emissivity_swath(8,:,:)=-999.9
+			Emissivity_swath(9,:,:)=-999.9
+		ENDWHERE
+	END IF	
   ! --------------------------------------------------------------------------
   ! 5. output Retrieve result
   ! --------------------------------------------------------------------------
@@ -1329,24 +1325,28 @@ PROGRAM main_clear_retrieve_landonly
 	
 	close(text_unit)
 	
-	! CALL write_emiss_hdf5(trim(adjustL(EMISS_FILENAME)),nchannel,npixel,nscan, &
-			! Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
-			! LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
-			! LZA_swath,CFR_swath,Clear_swath,&
-			! Sea_Frac,Cloud_Flag,Miss_swath,status)
-	
-	! IF(status/=0) THEN
-		! PRINT*,"└── Write emissivity HDF error : ",trim(adjustL(EMISS_FILENAME))
-		! Stop
-	! ENDIF		 
-	! PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_FILENAME))
-	
+	IF (HDF5) THEN
+		CALL write_emiss_hdf5(trim(adjustL(EMISS_HDF5)),nchannel,npixel,nscan, &
+				Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
+				LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
+				LZA_swath,CFR_swath,Clear_swath,&
+				Sea_Frac,Cloud_Flag,Miss_swath,status)
+		
+		IF(status/=0) THEN
+			PRINT*,"└── Write emissivity HDF5 error : ",trim(adjustL(EMISS_HDF5))
+			Stop
+		ENDIF		 
+		PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_HDF5))
+	END IF	
   ! --------------------------------------------------------------------------
   ! 6. free memory
   ! --------------------------------------------------------------------------	
-	! Deallocate(ERA5)
-	! DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
-	! DEALLOCATE(Emissivity_swath)
+	
+	IF (HDF5) THEN
+		DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
+		DEALLOCATE(Emissivity_swath)
+	END IF	
+	
 	DEALLOCATE(pixelid,scanid)
 	
 	DEALLOCATE(LST_land, Psrf_land, T2m_land, SnowC_land, SMC_land)	
