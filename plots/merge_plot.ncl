@@ -14,6 +14,7 @@ end do
 fmlse=new((/nrows,9/),float,-999.9)
 flon=new(nrows,float,-999.9)
 flat=new(nrows,float,-999.9)
+flag=new(nrows,float)
 
 irow=0
 do iF=0,dimsizes(fillist)-1
@@ -24,6 +25,7 @@ do iF=0,dimsizes(fillist)-1
 
     flon(irow:irow+nrow-1)=io(:,4)
     flat(irow:irow+nrow-1)=io(:,5)
+    flag(irow:irow+nrow-1)=io(:,ncol-1)
     fmlse(irow:irow+nrow-1,:)=io(:,7:7+8)  
 
     irow=irow+nrow
@@ -43,9 +45,9 @@ printVarSummary(fmlse)
     edgy(:,1)=flat-dx
     edgy(:,2)=flat+dx
 
-    wks:=gsn_open_wks("png", "EM_V")
-    wks1:=gsn_open_wks("png", "EM_H")
+    wks:=gsn_open_wks("png", "quicklook")
     gsn_define_colormap(wks, "WhiteBlueGreenYellowRed")
+
     res=True
     res@gsnFrame=False
     res@gsnDraw=False
@@ -55,19 +57,26 @@ printVarSummary(fmlse)
     res@cnLineLabelsOn = False
     res@cnInfoLabelOn = False
     res@cnFillMode = "CellFill"
-    res@lbLabelBarOn   =False
+    res@lbLabelBarOn   =True
+    res@lbBoxEndCapStyle="TriangleBothEnds"
+    res@lbOrientation="Vertical"
+    res@pmLabelBarWidthF=0.08
+    res@pmLabelBarOrthogonalPosF=0.01
+    res@lbLabelAutoStride=False
+    res@lbLabelStride=2
 
+    res@gsnSpreadColorStart=20
     res@cnLevelSelectionMode  = "ExplicitLevels"  
     ; res@cnLevels=(/0.7,0.74,0.78,0.82,0.86,0.84,0.88,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
-    res@cnLevels:=(/0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
+    res@cnLevels:=(/0.85,0.88,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
 
     res@mpFillOn=True
     res@gsnAddCyclic = False 
-    res@mpMinLatF = -90.
-    res@mpMaxLatF = 90.
+    res@mpMinLatF = -70.
+    res@mpMaxLatF = 70.
     res@mpMinLonF = -180.
     res@mpMaxLonF = 180.
-
+    res@tmXBLabelsOn=False
     ; res@mpMinLatF = min(flat)
     ; res@mpMaxLatF = max(flat)
     ; res@mpMinLonF = min(flon)-20
@@ -82,41 +91,39 @@ printVarSummary(fmlse)
     res@sfYArray := flat
     res@sfXCellBounds :=edgx
     res@sfYCellBounds :=edgy
-
+    
     channels=(/"10V","10H","18V","18H","23V","36V","36H","89V","89H"/)
+    plot:=new(10,graphic)
+
     ps:=(/0,2,4,5,7/) ; Vpol
-    ; ps=(/1,3,6,8/) ; Hpol
-
-    plot:=new(dimsizes(ps),graphic)
-
     do ip=0,dimsizes(ps)-1
-
-    res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
-    plot(ip)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
-
+        res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
+        plot(ip)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
-    resP=True
-    resP@gsnPanelLabelBar=True
-    ; resP@
-    gsn_panel(wks, plot, (/3,2/), resP)
-
-
-    res@cnLevels:=(/0.7,0.74,0.78,0.82,0.86,0.84,0.88,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
+    res@cnLevels:=(/0.7,0.75,0.8,0.85,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
     ps:=(/1,3,6,8/) ; Hpol
-    plot:=new(dimsizes(ps),graphic)
 
     do ip=0,dimsizes(ps)-1
-
-    res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
-    plot(ip)=gsn_csm_contour_map(wks1, fmlse(:,ps(ip)), res)
-
+        res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
+        if (ip.eq.3) then res@tmXBLabelsOn=True end if        
+        plot(ip+5)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
+    res@gsnLeftString="Geostationary Satellite Flag "
+    res@cnLevels:=(/1.5,2.5/)
+    res@lbLabelAlignment="BoxCenters"
+    res@lbBoxEndCapStyle="RectangleEnds"
+    res@lbLabelStride=1
+    res@lbLabelStrings=(/"H8","GOESR","MSG1"/)
+    res@gsnSpreadColorStart=60
+    plot(9)=gsn_csm_contour_map(wks, flag, res)
+
     resP=True
-    resP@gsnPanelLabelBar=True
-    ; resP@
-    gsn_panel(wks1, plot, (/2,2/), resP)
+    resP@gsnPanelBottom=0.02
+    gsn_panel(wks, plot, (/5,2/), resP)
+
+
 
 ; end do
 end
