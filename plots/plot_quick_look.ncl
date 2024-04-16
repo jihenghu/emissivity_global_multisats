@@ -1,12 +1,15 @@
 begin
 ; file_name="Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO.20150802-S000207-E013440.txt"
 
-fillist=systemfunc("ls Emissivity.Clear.GMI.HIMA.GOESR.MSG.*.txt")
+yyyymmdd=20170301
+path="/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/"+yyyymmdd+"/"
+
+fillist=systemfunc("cd "+path+" ; ls Emissivity.Clear.GMI.HIMA.GOESR.MSG.*.txt")
 
 nrows=0
 ncols=0
 do iF=0,dimsizes(fillist)-1
-    file_name=fillist(iF)
+    file_name=path+fillist(iF)
     nrow=numAsciiRow(file_name)
     nrows=nrows+nrow
 end do 
@@ -18,7 +21,7 @@ flag=new(nrows,float)
 
 irow=0
 do iF=0,dimsizes(fillist)-1
-    file_name=fillist(iF)
+    file_name=path+fillist(iF)
     nrow=numAsciiRow(file_name)
     ncol=numAsciiCol(file_name)
     io:=asciiread(file_name, (/nrow,ncol/), "float")
@@ -45,7 +48,7 @@ printVarSummary(fmlse)
     edgy(:,1)=flat-dx
     edgy(:,2)=flat+dx
 
-    wks:=gsn_open_wks("png", "quicklook")
+    wks:=gsn_open_wks("png", "Quick_Look-"+yyyymmdd)
     gsn_define_colormap(wks, "WhiteBlueGreenYellowRed")
 
     res=True
@@ -72,8 +75,8 @@ printVarSummary(fmlse)
 
     res@mpFillOn=True
     res@gsnAddCyclic = False 
-    res@mpMinLatF = -70.
-    res@mpMaxLatF = 70.
+    res@mpMinLatF = -60.
+    res@mpMaxLatF = 75.
     res@mpMinLonF = -180.
     res@mpMaxLonF = 180.
     res@tmXBLabelsOn=False
@@ -92,12 +95,12 @@ printVarSummary(fmlse)
     res@sfXCellBounds :=edgx
     res@sfYCellBounds :=edgy
     
-    channels=(/"10V","10H","18V","18H","23V","36V","36H","89V","89H"/)
+    channels=(/"10V","10H","18V","18H","23V","36V","36H","89V","89H","Flag"/)
     plot:=new(10,graphic)
 
     ps:=(/0,2,4,5,7/) ; Vpol
     do ip=0,dimsizes(ps)-1
-        res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
+        res@gsnLeftString="";+channels(ps(ip))
         plot(ip)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
@@ -105,22 +108,32 @@ printVarSummary(fmlse)
     ps:=(/1,3,6,8/) ; Hpol
 
     do ip=0,dimsizes(ps)-1
-        res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
+        ; res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
         if (ip.eq.3) then res@tmXBLabelsOn=True end if        
         plot(ip+5)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
-    res@gsnLeftString="Geostationary Satellite Flag "
-    res@cnLevels:=(/1.5,2.5/)
+    ; res@gsnLeftString="Geostationary Satellite Flag "
+    res@cnLevels:=(/0.5,1.5,2.5,6.5,7.5,8.5/)
     res@lbLabelAlignment="BoxCenters"
     res@lbBoxEndCapStyle="RectangleEnds"
     res@lbLabelStride=1
-    res@lbLabelStrings=(/"H8","GOESR","MSG1"/)
-    res@gsnSpreadColorStart=60
+
+    res@lbLabelStrings=(/"Missing","H8","GOESR","MSG1","H9","MSG2","MSG3"/)
+    cmap=read_colormap_file("grads_default")
+    ; cmap=read_colormap_file("GMT_paired")
+
+    res@cnFillPalette=cmap
+    res@cnFillColors=(/15,3,4,6,7,8,9/)-2
+    ; res@gsnSpreadColorEnd=6
     plot(9)=gsn_csm_contour_map(wks, flag, res)
 
     resP=True
-    resP@gsnPanelBottom=0.02
+    resP@gsnPanelBottom=0.01
+    resP@gsnPanelTop=0.98
+    resP@gsnPanelMainString="Quick Look "+yyyymmdd
+    resP@gsnPanelFigureStrings=channels
+    resP@gsnPanelFigureStringsJust="BottomLeft"
     gsn_panel(wks, plot, (/5,2/), resP)
 
 

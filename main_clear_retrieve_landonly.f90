@@ -98,17 +98,19 @@ PROGRAM main_clear_retrieve_landonly
   REAL*4, DIMENSION(3602,1800):: LSM_GRD
 
 !! Himawari-8/GOES-R
-  !! CLOUD FLAG:: -1:sea 0:out_of_boundary, 1:Himawari-8, 2:GOES-R, 3: MSG1/2,
-  !!  4: H8 missing; 5: GOES missing; 6: MSG1/2 missing;
-  !!  7: H8 LZA degrad; 8: GOES LZA>65 degrad; 9: MSG LZA degrad
+  !! CLOUD FLAG:: -1:sea 0:out_of_boundary, 1:H8, 2:GOES-R, 3: MSG1,
+  !!  4: Himawari missing; 5: GOES missing; 6: MSG1/2/3 missing;
+  !!  7: H9; 8: MSG2; 9: MSG3
   INTEGER, DIMENSION(:,:), ALLOCATABLE  :: Cloud_Flag 
+  INTEGER  :: cldflgmsg 
 
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: Sea_Frac  !! 0-100%
   REAL*4, DIMENSION(:,:,:), ALLOCATABLE ::CFR_swath,Clear_swath,Miss_swath 
   
   CHARACTER*255 :: AHI_FILENAME,GOES_FILENAME,AHI_FULLPATH,MSG_FILENAME,MSG_FULLPATH
   CHARACTER*255 :: record,lostfile,error_read
- 
+  CHARACTER*3 :: HIMA
+  
   REAL*4, DIMENSION(2401) :: lat_h8,lon_h8
 
   INTEGER, DIMENSION(2401,2401) ::ctype 
@@ -375,8 +377,12 @@ PROGRAM main_clear_retrieve_landonly
 2878    continue    		
 		
 		if (yyyymmdd<'20150704')  GOTO 8404
-		
-		AHI_FILENAME="NC_H08_"//yyyymmdd//"_"//HH//MM//"_L2CLP010_FLDK.02401_02401.nc" 
+		IF (yyyymmdd>'20221212') THEN
+			HIMA='H09'
+		ELSE 
+			HIMA='H08'
+		END IF
+		AHI_FILENAME="NC_"//HIMA//"_"//yyyymmdd//"_"//HH//MM//"_L2CLP010_FLDK.02401_02401.nc" 
 		 
 		IF (trim(AHI_FILENAME) .eq. trim(error_read)) then ! file with ill
 			Cloud_Flag(ipixel,iscan)=4                  
@@ -415,7 +421,7 @@ PROGRAM main_clear_retrieve_landonly
 			endif
 			
 			!! --------------------------------------------------------------------------					
-			!! 				Read Himawari-8 Cloud Proprties
+			!! 				Read Himawari-8/9 Cloud Proprties
 			!! --------------------------------------------------------------------------
 			
 			CALL read_AHI_L2_cloud(AHI_FULLPATH,lat_h8,lon_h8,ctype,status) ! E80~-160; N60~-60  cer[um]  cth[km]
@@ -488,7 +494,8 @@ PROGRAM main_clear_retrieve_landonly
 		IF(Cloud_Flag(ipixel,iscan).eq. 4)  THEN			
 			GOTO 8847
 		END IF
-	
+		IF (HIMA.eq.'H08')  Cloud_Flag(ipixel,iscan)= 1
+		IF (HIMA.eq.'H09')  Cloud_Flag(ipixel,iscan)= 7
 		GOTO 8404
 		
 
@@ -786,10 +793,13 @@ PROGRAM main_clear_retrieve_landonly
 		
 		IF (MSGSAT.EQ.'MSG1') then
 			Lambda0= 41.5
+			cldflgmsg=3
 		ELSE IF (MSGSAT.EQ.'MSG2') THEN
 			Lambda0= 45.5
+			cldflgmsg=8
 		ELSE IF (MSGSAT.EQ.'MSG3') THEN
 			Lambda0= 0
+			cldflgmsg=9
 		ELSE IF (MSGSAT.EQ.'MSG4') THEN
 			Lambda0= 0
 		ELSE
@@ -906,7 +916,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(:,ipixel,iscan)=100.	
 					
 			FLAG_GOES=.TRUE. 
-			Cloud_Flag(ipixel,iscan)= 3
+			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404 
@@ -946,7 +956,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(2:3,ipixel,iscan)=100.	
 					
 			FLAG_GOES=.TRUE. 
-			Cloud_Flag(ipixel,iscan)= 3
+			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404 
@@ -985,7 +995,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(3,ipixel,iscan)=100.	
 					
 			FLAG_GOES=.TRUE. 
-			Cloud_Flag(ipixel,iscan)= 3
+			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404 
@@ -993,7 +1003,7 @@ PROGRAM main_clear_retrieve_landonly
 
 		!!! Marked as Went Through a MSG collocation
 		FLAG_MSG=.TRUE.
-		Cloud_Flag(ipixel,iscan)= 3	
+		Cloud_Flag(ipixel,iscan)= cldflgmsg		
 		CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 		LZA_swath(ipixel, iscan) = 	angle	
 		!!----------------------------------------------------------------------------------------------
