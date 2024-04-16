@@ -84,7 +84,6 @@ PROGRAM main_clear_retrieve_landonly
   Implicit none
   CHARACTER(8) :: yyyymmdd
   CHARACTER(LEN=255) :: command
-  CHARACTER(LEN=255) :: TB_Clouds_OUT ,PWD
   CHARACTER(LEN=255) :: GMIL1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
   INTEGER :: file_unit,text_unit
 !! read GMI Vars
@@ -209,8 +208,6 @@ PROGRAM main_clear_retrieve_landonly
 ! ==================================================================================================
 !	 1. SET UP VARIABLES
 ! ==================================================================================================	 
-	!! present working Directory !! Very Important
-	PWD='/home/jihenghu/emissivity_research/retrieve_gmi_clear_opt/' 
 	
 	!! Directory to save GMI_L1C HDF5 files
 	GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
@@ -219,15 +216,13 @@ PROGRAM main_clear_retrieve_landonly
 	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
 	ERA5_DIR = '/home/jihenghu/data00/data/ERA5/'
     
-	!! OUTPUTs
-	TB_Clouds_OUT = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'     
+	!! OUTPUTs 
     EMISS_OUTDIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
 	
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
-	CALL system("mkdir -p  "//trim(TB_Clouds_OUT))
 	CALL system("mkdir -p  "//trim(EMISS_OUTDIR))
 	CALL system("mkdir -p  "//trim(ERA5_DIR))
 
@@ -244,7 +239,6 @@ PROGRAM main_clear_retrieve_landonly
     STOP
   END IF  
   
-  CALL system("mkdir -p  "//trim(TB_Clouds_OUT)//"/"//yyyymmdd)
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd)
   
 ! ==================================================================================================
@@ -1105,7 +1099,7 @@ PROGRAM main_clear_retrieve_landonly
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_profiles.py "//&
+					call system("python3 subs/era5/download_era5_profiles.py "//&
 								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Plevels file found for HR1: ",HH1,":00. Extracting vars....."
@@ -1113,7 +1107,7 @@ PROGRAM main_clear_retrieve_landonly
 				
 				if (.not.alive2) then 
 					print*, "│  │  ├── ERA5-Land file Not Found, calling Python downloading script....."	
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_lands.py "//&
+					call system("python3 subs/era5/download_era5_lands.py "//&
 								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR1: ",HH1,":00. Extracting vars....."					
@@ -1138,14 +1132,14 @@ PROGRAM main_clear_retrieve_landonly
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_profiles.py "//&
+					call system("python3 subs/era5/download_era5_profiles.py "//&
 								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Plevels file found for HR2: ",HH2,":00. Extracting vars....."
 				end if
 				if (.not.alive2) then 
 					print*, "│  │  ├── ERA5-Land file Not Found, calling Python downloading script....."	
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_lands.py "//&
+					call system("python3 subs/era5/download_era5_lands.py "//&
 								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR2: ",HH2,":00. Extracting vars....."					
@@ -1375,9 +1369,6 @@ PROGRAM main_clear_retrieve_landonly
 	! Close the filelist
 	CLOSE(file_unit)
 	
-	!! remove goesr;; becareful, not recommended
-	! call system("cd "//trim(GEOS_DIR)//"/"//yyyymmdd//" ; rm -r *")
-
 END PROGRAM main_clear_retrieve_landonly
 
 
