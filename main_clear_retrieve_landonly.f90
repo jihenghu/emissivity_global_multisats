@@ -143,7 +143,7 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER*255 :: REC_MSG_STAMP,MSG_MISSING_STAMP,CURRENT_MSG_STAMP
   INTEGER,DIMENSION(3712,3712) :: CLM_MSG
   LOGICAL :: OK
-  REAL :: Lambda0
+  REAL :: Lambda0,lambda16
   INTEGER :: W,E,S,N, dum
  
 !! general
@@ -221,7 +221,7 @@ PROGRAM main_clear_retrieve_landonly
 	!! OUTPUTs 
     EMISS_OUTDIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
 	
-	REDO=.False.  ! .True.!! redo retrieve or not?
+	REDO=.True.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
@@ -236,8 +236,8 @@ PROGRAM main_clear_retrieve_landonly
 
   ! Get the date string from the command-line argument
   CALL GETARG(1, yyyymmdd)
-  IF (yyyymmdd<'20150704') THEN
-    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2015.07.04.'
+  IF (yyyymmdd<'20140407') THEN
+    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.04.07.'
     STOP
   END IF  
   
@@ -364,8 +364,8 @@ PROGRAM main_clear_retrieve_landonly
 		!! ------------------------------------------------------------------------------------------------
 		! PRINT*, lon, lat
 		IF((lon.gt.80 .and. lon .le. 180).OR.((lon.ge.-180 .and. lon .lt. -160))) goto 2878   !! go to H-8		
-		IF(lon.gt.-156 .and. lon .lt. 6) then
-			if (yyyymmdd>'20170501') GOTO 9642     !! goto GOESR	
+		IF(lon.gt.-156 .and. lon .lt. -10) then
+			if (yyyymmdd>'20170419') GOTO 9642     !! goto GOESR	
 		end if
 		IF(lon.gt.-67.5 .and. lon .lt. 113 ) GOTO  8847       !! goto MSG				
 		GOTO 8404 !! goto Hell, no geostationary satellite mission region
@@ -508,6 +508,7 @@ PROGRAM main_clear_retrieve_landonly
 		!! 		FullDisk mode06 ( 10-min interval: 00,10,20,30,40,50 same as Himawari-8 )
 		!!        https://www.goes-r.gov/products/docs/PUG-L2+-vol5.pdf
 		!!   RESOLUTIONs (NADIR):: 56 urad (2 KM), 112 urad(4KM), 280 urad(10KM)
+		!!   nadir shit info: 20171214 from -89.5 to -75.2
 		!!----------------------------------------------------------------------------------------------
 ! GOES
 9642    continue 
@@ -515,26 +516,32 @@ PROGRAM main_clear_retrieve_landonly
 		IF(yyyymmdd.gt.'20190402') Mode='M6'
 		IF(yyyymmdd.lt.'20190402') Mode='M3'
 		IF(yyyymmdd.eq.'20190402') then
-			if (MM.lt.'16')	then
+			if (HH.lt.'16')	then
 				Mode='M3'
 			else
 				Mode='M6'
 			end if
 		END IF
 		
-		IF(.NOT.(lon.gt.-156 .and. lon .lt. 6)) GOTO 8847		
-	    IF (yyyymmdd<'20200101') THEN
+		IF (Mode=='M3') WRITE(MM,'(i0.2)') int(int((stime-int(stime))*60)/15)*15  
+		IF (Mode=='M6') WRITE(MM,'(i0.2)') int(int((stime-int(stime))*60)/10)*10
+		
+		lambda16=-75.2
+		IF (yyyymmdd.lt.'20171214') lambda16=-89.5
+		
+		IF(.NOT.(lon.gt.-156 .and. lon .lt. -10)) GOTO 8847		
+	    IF (yyyymmdd<'20170419') THEN
 			Cloud_Flag(ipixel,iscan)=5
 			GOTO 8847  !! MSG has it
 		ENDIF
 		! print*,lon,lat
-		CALL get_SZA_GOESR_LonLat(lon,lat,xdeg,ydeg,GOES_IN)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,lat,xdeg,ydeg,GOES_IN)
 		IF (.NOT.GOES_IN) THEN
 			Cloud_Flag(ipixel,iscan)=0
 			GOTO 8847  ! MSG has it
 		END IF  !! outof GOES-R sight
 		
-		GOES_CUR_STMAP="STAMP_"//yyyymmdd//"_"//HH//MM
+		GOES_CUR_STMAP="G16_"//Mode//"_"//yyyymmdd//"_"//HH//MM
 		
 		IF (TRIM(GOES_CUR_STMAP).EQ.TRIM(GOES_MISS_STMAP)) THEN
 			Cloud_Flag(ipixel,iscan)=5
@@ -555,7 +562,7 @@ PROGRAM main_clear_retrieve_landonly
 					print*, '│  │  ├── GOES-R files downloading ......'				
 					CALL download_GOESR_AWS_all(yyyymmdd,HH,GEOS_DIR)  !!! download for all day
 				ELSE
-					PRINT*,"│  │  └── GOES file notfound, skip ......"
+					PRINT*,"│  │  └── GOES file notfound, "//TRIM(GOES_FILENAME)
 					GOES_MISS_STMAP=GOES_CUR_STMAP
 					Cloud_Flag(ipixel,iscan)=5
 					GOTO 8847				
@@ -568,7 +575,7 @@ PROGRAM main_clear_retrieve_landonly
 			!!  Cloud Mask DIMENSION(5424,5424)
 			!!	-1: NaN; 0: clear;  1:cloudy
 			!! -------------------------------------------------------------------------	
-			CALL read_GOES_CLM(yyyymmdd,HH//MM,GEOS_DIR,CLM_GOES,A1)
+			CALL read_GOES_CLM(yyyymmdd,HH//MM,TRIM(GOES_FILENAME),CLM_GOES,A1)
 				! print*,MinVal(CLM_GOES),MAXVAL(CLM_GOES)  
 				! print*,CLM_GOES(:20,1)
 
@@ -585,11 +592,11 @@ PROGRAM main_clear_retrieve_landonly
 			!!    5 degraded_due_to_failed_band_2_tests_qf 
 			!!    6 degraded_due_to_other_bad_bands_qf
 			!! --------------------------------------------------------------------------
-			CALL read_GOES_DQF2(yyyymmdd,HH//MM,GEOS_DIR,DQF_CLM,A7)  	  
+			CALL read_GOES_DQF2(yyyymmdd,HH//MM,TRIM(GOES_FILENAME),DQF_CLM,A7)  	  
 				! PRINT*,MinVal(DQF_CLM),MAXVAL(DQF_CLM)
 
 			IF(.NOT.(A1.AND.A7)) THEN  !! SOME file MISSING
-				PRINT*,"│  │  └── READ GOES file error, skip ......"
+				PRINT*,"│  │  └── READ GOES file error: "//TRIM(GOES_FILENAME)
 				GOES_MISS_STMAP=GOES_CUR_STMAP
 				Cloud_Flag(ipixel,iscan)=5
 				GOTO 8847
@@ -614,10 +621,10 @@ PROGRAM main_clear_retrieve_landonly
 		latN=lat+0.25
 		latS=lat-0.25
 		
-		CALL get_SZA_GOESR_LonLat(lonW,lat,Wf,x0,FLAG1)
-		CALL get_SZA_GOESR_LonLat(lonE,lat,Ef,x0,FLAG2)
-		CALL get_SZA_GOESR_LonLat(lon,latN,x0,Nf,FLAG3)
-		CALL get_SZA_GOESR_LonLat(lon,latS,x0,Sf,FLAG4)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latS,x0,Sf,FLAG4)
 		
 		IF (.not.(FLAG1.OR.FLAG2.OR.FLAG3.OR.FLAG4)) THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -649,7 +656,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_GOES(W1,N1) .EQ. 1)  CFR_swath(:,ipixel,iscan)=100.	
 			
 			FLAG_GOES=.TRUE. 
-			CALL calc_LZA(lon,lat,-75.0,0.,angle)	
+			CALL calc_LZA(lon,lat,lambda16,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle
 			Cloud_Flag(ipixel,iscan)= 2				
 			GOTO 8404 
@@ -662,10 +669,10 @@ PROGRAM main_clear_retrieve_landonly
 		latN=lat+0.15
 		latS=lat-0.15
 		
-		CALL get_SZA_GOESR_LonLat(lonW,lat,Wf,x0,FLAG1)
-		CALL get_SZA_GOESR_LonLat(lonE,lat,Ef,x0,FLAG2)
-		CALL get_SZA_GOESR_LonLat(lon,latN,x0,Nf,FLAG3)
-		CALL get_SZA_GOESR_LonLat(lon,latS,x0,Sf,FLAG4)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latS,x0,Sf,FLAG4)
 		
 		IF (.not.(FLAG1.OR.FLAG2.OR.FLAG3.OR.FLAG4)) THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -699,7 +706,7 @@ PROGRAM main_clear_retrieve_landonly
 
 			Cloud_Flag(ipixel,iscan)= 2		
 	
-			CALL calc_LZA(lon,lat,-75.0,0.,angle)	
+			CALL calc_LZA(lon,lat,lambda16,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404
 		ENDIF
@@ -709,10 +716,10 @@ PROGRAM main_clear_retrieve_landonly
 		lonE=lon+0.08
 		latN=lat+0.08
 		latS=lat-0.08
-		CALL get_SZA_GOESR_LonLat(lonW,lat,Wf,x0,FLAG1)
-		CALL get_SZA_GOESR_LonLat(lonE,lat,Ef,x0,FLAG2)
-		CALL get_SZA_GOESR_LonLat(lon,latN,x0,Nf,FLAG3)
-		CALL get_SZA_GOESR_LonLat(lon,latS,x0,Sf,FLAG4)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latS,x0,Sf,FLAG4)
 		
 		IF (.not.(FLAG1.OR.FLAG2.OR.FLAG3.OR.FLAG4)) THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -745,7 +752,7 @@ PROGRAM main_clear_retrieve_landonly
 		!! Marked as Went Through a GOES-R collocation
 	
 		Cloud_Flag(ipixel,iscan)= 2		
-		CALL calc_LZA(lon,lat,-75.0,0.,angle)	
+		CALL calc_LZA(lon,lat,lambda16,0.,angle)	
 		LZA_swath(ipixel, iscan) = 	angle			
 		FLAG_GOES=.TRUE.  
 		
@@ -775,8 +782,11 @@ PROGRAM main_clear_retrieve_landonly
 
 		IF (yyyymmdd<'20220601') MSGSAT='MSG1'
 		IF (yyyymmdd>'20220601') MSGSAT='MSG2'
-		IF (yyyymmdd<'20170201') MSGSAT='MSG3'
-
+		IF (yyyymmdd<'20170201') THEN
+			MSGSAT='MSG3'
+			IF(lon.gt.67.5) goto 8404
+		END IF
+		
 		IF (lon.lt.-20 .and. lon.gt.-67) then
 			IF (yyyymmdd>'20170201'.and. yyyymmdd<'20170608') then
 				MSGSAT='MSG3'
@@ -784,7 +794,7 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 			
 		IF (yyyymmdd.eq.'20220601') THEN
-			IF(HH//MM15.lt.'0850') THEN
+			IF(HH.lt.'09') THEN
 				MSGSAT='MSG1'
 			ELSE
 				MSGSAT='MSG2'

@@ -1,7 +1,7 @@
 begin
 ; file_name="Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO.20150802-S000207-E013440.txt"
 
-yyyymmdd=20170301
+; yyyymmdd=20170301
 path="/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/"+yyyymmdd+"/"
 
 fillist=systemfunc("cd "+path+" ; ls Emissivity.Clear.GMI.HIMA.GOESR.MSG.*.txt")
@@ -48,7 +48,7 @@ printVarSummary(fmlse)
     edgy(:,1)=flat-dx
     edgy(:,2)=flat+dx
 
-    wks:=gsn_open_wks("png", "Quick_Look-"+yyyymmdd)
+    wks:=gsn_open_wks("png", path+"Quick_Look-"+yyyymmdd)
     gsn_define_colormap(wks, "WhiteBlueGreenYellowRed")
 
     res=True
