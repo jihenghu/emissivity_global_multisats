@@ -1,16 +1,18 @@
-subroutine read_ERA5_dims(filename,nlon,nlat,nlevel,ntime)
+subroutine read_ERA5_dims(filename,nlon,nlat,nlevel,ntime,retIO)
 	include 'netcdf.inc'
 
 	character*(*) ::filename
 	integer nlon, nlat, nlevel, ntime
 	Integer iopen,ioquire,ncid,ioclose
 	Integer lon_dimid,lat_dimid,level_dimid,time_dimid
-	
+	Logical retIO
+	retIO=.TRUE.
 	! print*,filename
 	iopen=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)
     if (iopen .ne. 0) then
         print*,"ERA5 open failure!"
-        stop
+		retIO=.FALSE.
+        return
     end if
 	
 	ioquire=nf_inq_dimid (ncid, 'longitude', lon_dimid) 
@@ -30,7 +32,7 @@ subroutine read_ERA5_dims(filename,nlon,nlat,nlevel,ntime)
 	ioclose=nf_close(ncid)
 end subroutine
 
-subroutine read_ERA5_profiles(filename,lon,lat,qw,ta)
+subroutine read_ERA5_profiles(filename,lon,lat,qw,ta,retIO)
 	include 'netcdf.inc'	
 	
 	character*(*) ::  filename
@@ -40,12 +42,17 @@ subroutine read_ERA5_profiles(filename,lon,lat,qw,ta)
 	Integer*2, DIMENSION(nlon,nlat,nlevel,ntime) :: temp  
 	real*8 scalef,offsetf
 	Integer iopen,ioquire,ncid,varid,ioclose
+	Logical retIO
+	retIO=.TRUE.
+	
  	! print*,trim(adjustl(filename))
     iopen=nf_open(trim(adjustl(filename)),nf_nowrite,ncid) !打开netcdf文件，获取文件的ID号(ncid)      
     if (iopen .ne. 0) then
-        print*,"Geolocation file, open failure!"
-        stop
+        print*,"profiles file, open failure!"
+        retIO=.FALSE.
+        return
     end if
+	
     ioquire=nf_inq_varid (ncid, 'longitude', varid) 
     iovar=nf_get_var_real(ncid,varid,lon)
 	
@@ -59,8 +66,11 @@ subroutine read_ERA5_profiles(filename,lon,lat,qw,ta)
 	qw=temp*scalef+offsetf
 ! print*,minval(qw),maxval(qw)	
 	where(qw.lt.0) qw=0.0
-
-   
+	
+	IF(maxval(qw).gt.100) THEN
+		print*,"ERA5 Specific Humidity is downloaded wrong, SKIP all day!!"
+		Stop
+	END IF
     ioquire=nf_inq_varid (ncid, 't', varid)
     iovar=nf_get_var(ncid,varid,temp)
 	iovar=nf_get_att_double(ncid, varid, 'scale_factor', scalef)
@@ -127,7 +137,7 @@ subroutine read_ERA5_hydros(filename,cc,ciwc,clwc,crwc,cswc)
 	ioclose=nf_close(ncid)
 END SUBROUTINE
 
-subroutine read_ERA5_landvars(filename,skt,psrf,t2m,snowc,swvl1)
+subroutine read_ERA5_landvars(filename,skt,psrf,t2m,snowc,swvl1,retIO)
 ! subroutine read_ERA5_landvars(filename,skt,psrf,t2m,stl1,swvl1,snowc,sde)
 	include 'netcdf.inc'	
 	
@@ -140,12 +150,15 @@ subroutine read_ERA5_landvars(filename,skt,psrf,t2m,snowc,swvl1)
 	
 	Integer iopen,ioquire,ncid,varid,ioclose
 	real*8 scalef,offsetf
- 
+ 	Logical retIO
+	retIO=.TRUE.
+	
 	! print*,trim(adjustl(filename))
     iopen=nf_open(trim(adjustl(filename)),nf_nowrite,ncid) !打开netcdf文件，获取文件的ID号(ncid)      
     if (iopen .ne. 0) then
         print*,"EAR-Land file, open failure!"
-        stop
+        retIO=.FALSE.
+        return
     end if
 
     ioquire=nf_inq_varid (ncid, 'skt', varid) 

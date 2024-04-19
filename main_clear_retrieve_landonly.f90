@@ -87,7 +87,7 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER(LEN=255) :: GMIL1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
   INTEGER :: file_unit,text_unit
 !! read GMI Vars
-  INTEGER :: nscan, npixel, nchannel
+  INTEGER :: nscan, npixel, nchannel, GMIIO
   REAL*4, DIMENSION(:,:,:), ALLOCATABLE :: TB_swath,Emissivity_swath
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: Latitude, Longitude
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: ScanTime_swath
@@ -170,7 +170,7 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER*2 :: HH1,HH2
   INTEGER :: UTC_hr1, UTC_hr2
   REAL    :: wt1,wt2
-
+  LOGICAL :: profIO,landIO
 
   INTEGER,PARAMETER :: nlon=1440, nlat=561,nlevel=29, ntime=1
   REAL,PARAMETER    :: egrid=0.25
@@ -213,15 +213,15 @@ PROGRAM main_clear_retrieve_landonly
 	
 	!! Directory to save GMI_L1C HDF5 files
 	GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
-	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2CLP/'    
+	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
-	ERA5_DIR = '/home/jihenghu/data00/data/ERA5/'
+	ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
     
 	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/'    
+    EMISS_OUTDIR = '/home/jihenghu/data00/data_em/GMI_EMISSIVITY/'    
 	
-	REDO=.True.  ! .True.!! redo retrieve or not?
+	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
@@ -281,13 +281,15 @@ PROGRAM main_clear_retrieve_landonly
    !! --------------------------------------------------------------------------------------------------	
     PRINT *, '├──> Read GMI file: 1C.GPM.GMI.XCAL2016-C.'//trim(GMI_Sufix)//".******.HDF5" 
 	! get HDF5 file Dimension
-	CALL get_GMI_primary_dims(GMI_FILENAME,nscan,npixel,nchannel)
-
+	GMIIO=0
+	CALL get_GMI_primary_dims(GMI_FILENAME,nscan,npixel,nchannel,GMIIO)
+	IF (GMIIO.NE.0) goto 176
+	
 	! Call the subroutine to read data	
 	ALLOCATE(Latitude(npixel,nscan), Longitude(npixel,nscan), LZA_swath(npixel,nscan))	
 	ALLOCATE(TB_swath(nchannel,npixel,nscan), ScanTime_swath(npixel,nscan), ScanTime(nscan))	
-	CALL read_GMI_Vars(GMI_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel)
-	
+	CALL read_GMI_Vars(GMI_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel,GMIIO)
+	IF (GMIIO.NE.0) goto 176
 	!! read global 0.01deg land sea mask: land 0% - 25% (strict land) - 75% (coastal) - 100% strict sea
 	!! longitude[3602] -0.05 ~ 360.05  ; latitude[1800]  -89.95 ~ 89.95
 	CALL read_land_sea_mask("subs/IMERG_land_sea_mask.nc",LSM_GRD)
@@ -1133,8 +1135,10 @@ PROGRAM main_clear_retrieve_landonly
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR1: ",HH1,":00. Extracting vars....."					
 				end if
 								
-				call read_ERA5_profiles(trim(req_era5_hr1),elon,elat,qw1,ta1)
-				call read_ERA5_landvars(trim(req_land_hr1),lst1,psrf1,t2m1,snowc1,smc1)        !! K, hPa, K     !!  1 (top) -> 29 (bottom)
+				call read_ERA5_profiles(trim(req_era5_hr1),elon,elat,qw1,ta1,profIO)
+				call read_ERA5_landvars(trim(req_land_hr1),lst1,psrf1,t2m1,snowc1,smc1,landIO)        !! K, hPa, K     !!  1 (top) -> 29 (bottom)
+				
+				IF (.NOT.(profIO.and.landIO)) goto 1505
 				
 				where(qw1.eq.0) qw1=1E-9			
 			END IF
@@ -1165,8 +1169,13 @@ PROGRAM main_clear_retrieve_landonly
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR2: ",HH2,":00. Extracting vars....."					
 				end if
 							
-				call read_ERA5_profiles(trim(req_era5_hr2),elon,elat,qw2,ta2)
-				call read_ERA5_landvars(trim(req_land_hr2),lst2,psrf2,t2m2,snowc1,smc2)
+				call read_ERA5_profiles(trim(req_era5_hr2),elon,elat,qw2,ta2,profIO)
+				call read_ERA5_landvars(trim(req_land_hr2),lst2,psrf2,t2m2,snowc1,smc2,landIO)
+				
+				IF (.NOT.(profIO.and.landIO)) THEN
+					call system("rm -v "//trim(req_land_hr2) )
+					goto 1505
+				END IF
 				where(qw2.eq.0) qw2=1E-9	
 				
 			END IF
@@ -1355,12 +1364,13 @@ PROGRAM main_clear_retrieve_landonly
   ! --------------------------------------------------------------------------
   ! 6. free memory
   ! --------------------------------------------------------------------------	
-	
+
 	IF (HDF5) THEN
 		DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
 		DEALLOCATE(Emissivity_swath)
 	END IF	
-	
+
+1505 continue	
 	DEALLOCATE(pixelid,scanid)
 	
 	DEALLOCATE(LST_land, Psrf_land, T2m_land, SnowC_land, SMC_land)	
