@@ -101,7 +101,7 @@ printVarSummary(fmlse)
     ps:=(/0,2,4,5,7/) ; Vpol
     do ip=0,dimsizes(ps)-1
         res@gsnLeftString="";+channels(ps(ip))
-        plot(ip)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
+        plot(ip*2)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
     res@cnLevels:=(/0.7,0.75,0.8,0.85,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
@@ -109,8 +109,8 @@ printVarSummary(fmlse)
 
     do ip=0,dimsizes(ps)-1
         ; res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
-        if (ip.eq.3) then res@tmXBLabelsOn=True end if        
-        plot(ip+5)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
+        ; if (ip.eq.3) then res@tmXBLabelsOn=True end if        
+        plot(ip*2+1)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
     ; res@gsnLeftString="Geostationary Satellite Flag "
