@@ -1172,10 +1172,8 @@ PROGRAM main_clear_retrieve_landonly
 				call read_ERA5_profiles(trim(req_era5_hr2),elon,elat,qw2,ta2,profIO)
 				call read_ERA5_landvars(trim(req_land_hr2),lst2,psrf2,t2m2,snowc1,smc2,landIO)
 				
-				IF (.NOT.(profIO.and.landIO)) THEN
-					call system("rm -v "//trim(req_land_hr2) )
-					goto 1505
-				END IF
+				IF (.NOT.(profIO.and.landIO)) goto 1505
+				
 				where(qw2.eq.0) qw2=1E-9	
 				
 			END IF

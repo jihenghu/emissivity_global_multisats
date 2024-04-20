@@ -67,7 +67,7 @@ subroutine read_ERA5_profiles(filename,lon,lat,qw,ta,retIO)
 ! print*,minval(qw),maxval(qw)	
 	where(qw.lt.0) qw=0.0
 	
-	IF(maxval(qw).gt.100) THEN
+	IF(maxval(qw).gt.1) THEN
 		print*,"ERA5 Specific Humidity is downloaded wrong, SKIP all day!!"
 		Stop
 	END IF
