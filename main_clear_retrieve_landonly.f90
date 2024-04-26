@@ -15,9 +15,9 @@
 !!  TOC:
 !!  - Collocate TB and Clouds:
 !!    The clouds come from three GeoSats that cover the whole globe except for high-latitudes:
-!!		- Himawari-8/AHI over the Pacific Ocean 
+!!		- Himawari-8&9/AHI over the Pacific Ocean 
 !!	 	- GOES-16/ABI over the America
-!!	 	- MSG-1&2&3/SERV over the Indian Ocean
+!!	 	- MSG-1&2&3/SERV over the EU and Africa
 !!  - Collocate tb-cloud to ERA5 profiles and LST;
 !!  - Call RTTOV V13.2 to retrieve multichannel allsky emissivity:
 !! 	  Use the direct retrieving scheme porposed by (Baord et al., 2016), considering clearsky 
@@ -35,10 +35,10 @@
 !! 							DATA AVAILABLE RANGE 
 !!---------------------------------------------------------------------------------------------
 !! GMI L1C :  2014.03.04 - present, every orbits
-!! H-8 AHI L2CLP : 2015.07.04 - present, every 10-min  
+!! H-8/9 AHI L2CLP : 2015.07.04 - present, every 10-min  
 !! GOES-R ABI L2 Cloud : AWS (2019.339-present, 10-min)  CLASS/NCEI(2017.06.08-present) “hard”
 !! MSG1/2 indian sea : 2017.2.1 - present  ONLY Cloud Mask , 15-min 
-!! MSG3 0^oE : 2014.2.1 - present  ONLY Cloud Mask , 15-min 
+!! MSG3 0E : 2014.2.1 - present  ONLY Cloud Mask , 15-min 
 !! ERA5: 1-hour, 0.25-degree, 37-layer
 !! ============================================================================================
 
