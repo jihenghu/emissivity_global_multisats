@@ -8,6 +8,7 @@
 *.png
 *.jpg
 *.ps
+*.HDF5
 
 logs/
 filelists/
