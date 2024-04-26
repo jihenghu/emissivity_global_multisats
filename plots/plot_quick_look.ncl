@@ -48,7 +48,7 @@ printVarSummary(fmlse)
     edgy(:,1)=flat-dx
     edgy(:,2)=flat+dx
 
-    wks:=gsn_open_wks("png", path+"Quick_Look-"+yyyymmdd)
+    wks:=gsn_open_wks("png", "quick_looks/Quick_Look-"+yyyymmdd)
     gsn_define_colormap(wks, "WhiteBlueGreenYellowRed")
 
     res=True

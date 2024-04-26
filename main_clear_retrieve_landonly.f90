@@ -860,9 +860,10 @@ PROGRAM main_clear_retrieve_landonly
 			!!! or -L/home/jihenghu/eccodes/lib64/  -leccodes_f90 -leccodes  -I/home/jihenghu/eccodes/include/
 			CLM_MSG=-1
 			! print*,"HERE0", MSG_FULLPATH
-			CALL read_MSG_CLM(MSG_FULLPATH,CLM_MSG)	
+
+			CALL read_MSG_CLM(MSG_FULLPATH,CLM_MSG,status)	
 			
-			IF (MINVAL(CLM_MSG)<0.and.MAXVAL(CLM_MSG)<0) THEN         
+			IF (status.NE.0 .OR.(MINVAL(CLM_MSG)<0.and.MAXVAL(CLM_MSG)<0)) THEN         
 				PRINT*,"│  │  └── READ MSG CLOUD ERROR**:", TRIM(CURRENT_MSG_STAMP)
 				MSG_MISSING_STAMP=CURRENT_MSG_STAMP
 				Cloud_Flag(ipixel,iscan)=6				    

@@ -46,19 +46,22 @@
 !! See examples of grib2 read using eccodes:
 !! https://confluence.ecmwf.int/display/ECC/grib_print_data
 !! ALSO, use grib_dump to view the meta
-subroutine read_MSG_CLM(filename,cloud_mask)
+subroutine read_MSG_CLM(filename,cloud_mask,status)
   use eccodes
   implicit none
 
   character(len=*), intent(in) :: filename
   integer, dimension(3712,3712),INTENT(OUT) :: cloud_mask
- 
+  integer,INTENT(OUT) :: status
+  
   real*4, dimension(:), allocatable :: clm_1d
   integer :: ifile, igrib,is,ip
 
   allocate(clm_1d(3712*3712)) !! radicules
   
-  call codes_open_file(ifile, trim(filename),'r')
+  call codes_open_file(ifile, trim(filename),'r',status)
+  IF (status/=CODES_SUCCESS) RETURN
+  
   call codes_grib_new_from_file(ifile,igrib)
   call codes_get(igrib,'values',clm_1d) 
   call codes_release(igrib)	

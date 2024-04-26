@@ -1,6 +1,6 @@
 begin
 
-path="/home/jihenghu/data00/data/GMI_EMISSIVITY_MSG3/"
+path="/home/jihenghu/data00/data_em/GMI_EMISSIVITY/"
 
 dates=systemfunc("ls "+path)
 numfiles=new(dimsizes(dates), integer)

@@ -1,7 +1,7 @@
 begin
 ; file_name="Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO.20150802-S000207-E013440.txt"
 
-fillist=systemfunc("ls Emissivity.Clear.GMI.HIMA.GOESR.MSG.20150802-S061224-E074457.txt")
+fillist=systemfunc("ls /home/jihenghu/data00/data_em/GMI_EMISSIVITY/20180924/*.txt")
 
 do iF=0,dimsizes(fillist)-1
     file_name=fillist(iF)
@@ -93,14 +93,14 @@ do iF=0,dimsizes(fillist)-1
     do ip=0,dimsizes(ps)-1
 
     res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))
-    plot(ip)=gsn_csm_contour_map(wks1, mlse(:,ps(ip)), res)
+    ; plot(ip)=gsn_csm_contour_map(wks1, mlse(:,ps(ip)), res)
 
     end do
 
     resP=True
     resP@gsnPanelLabelBar=True
     ; resP@
-    gsn_panel(wks1, plot, (/2,2/), resP)
+    ; gsn_panel(wks1, plot, (/2,2/), resP)
 
     lza=where(lza.lt.0, lza@_FillValue,lza)
     lza=where(lza.gt.88, lza@_FillValue,lza)
@@ -109,7 +109,7 @@ do iF=0,dimsizes(fillist)-1
     res@gsnFrame=True
     res@cnLevels:=(/5,10,20,30,40,50,60,70,80,85/)
     res@gsnLeftString="LZA"
-    plot1=gsn_csm_contour_map(wks2, lza, res)
+    ; plot1=gsn_csm_contour_map(wks2, lza, res)
 
 
 
