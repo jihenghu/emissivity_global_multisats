@@ -46,7 +46,7 @@ c.retrieve(
         'time': UTC+':00',
         'area': [70, -180, -70, 180,],
         # 'area': [30, 120, 20, 130,],
-        'grid': ['0.25','0.25']
+        # 'grid': ['0.25','0.25']
     },
     CDIR+"/"+yyyymmdd+'/ERA5-PL-GBL-25km-'+yyyymmdd+'-'+UTC+'00.nc')
     # 'ERA5-PL-GBL-'+year+month+day+time+'.nc')

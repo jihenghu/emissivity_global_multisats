@@ -73,12 +73,12 @@ SUBROUTINE read_GOES_CLM(yyyymmdd,HHMM,GEOS_L2_DIR,CLM_GOES,AG)
 	INTEGER, DIMENSION(5424,5424), INTENT(OUT) ::  CLM_GOES	
 	LOGICAL, INTENT(OUT) :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename
+	! Character*255 :: filename
 	AG=.TRUE.	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'BCM', varid) 
 	status=nf_get_var_int(ncid,varid,CLM_GOES)
 	status=nf_close(ncid)	
@@ -96,13 +96,13 @@ SUBROUTINE read_GOES_PHASE(yyyymmdd,HHMM,GEOS_L2_DIR,PHASE_GOES,AG)
 	INTEGER, DIMENSION(5424,5424), INTENT(OUT) ::  PHASE_GOES	
 	LOGICAL, INTENT(OUT) :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename	
+	! Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-ACTPF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-ACTPF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'Phase', varid) 
 	status=nf_get_var_int(ncid,varid,PHASE_GOES)
 	status=nf_close(ncid)	
@@ -121,13 +121,13 @@ SUBROUTINE read_GOES_CER(yyyymmdd,HHMM,GEOS_L2_DIR,CER_GOES,AG)
 	Integer, DIMENSION(5424,5424) ::  CER	
 	LOGICAL, INTENT(OUT)  :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename	
+	! Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-CPSF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-CPSF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'PSD', varid) 
 	status=nf_get_var_int(ncid,varid,CER)
 	status=nf_close(ncid)	
@@ -151,13 +151,13 @@ SUBROUTINE read_GOES_COT(yyyymmdd,HHMM,GEOS_L2_DIR,COT_GOES,AG)
 	Integer, DIMENSION(2712,2712) ::  COD	
 	LOGICAL, INTENT(OUT)  :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename	
+	! Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-CODF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-CODF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'COD', varid) 
 	status=nf_get_var_int(ncid,varid,COD)
 	status=nf_close(ncid)	
@@ -182,13 +182,13 @@ SUBROUTINE read_GOES_CTH(yyyymmdd,HHMM,GEOS_L2_DIR,CTH_GOES,AG)
 	Integer, DIMENSION(1086,1086) ::  CTH	
 	LOGICAL, INTENT(OUT)  :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename	
+	! Character*255 :: filename	
 	AG=.TRUE.
 	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-ACHAF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-ACHAF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'HT', varid) 
 	status=nf_get_var_int(ncid,varid,CTH)
 	status=nf_close(ncid)	
@@ -213,12 +213,12 @@ SUBROUTINE read_GOES_DQF1(yyyymmdd,HHMM,GEOS_L2_DIR,DQF_GOES,AG)
 	INTEGER, DIMENSION(5424,5424), INTENT(OUT) ::  DQF_GOES	
 	LOGICAL, INTENT(OUT) :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename
+	! Character*255 :: filename
 	AG=.TRUE.	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-CPSF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-CPSF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'DQF', varid) 
 	status=nf_get_var_int(ncid,varid,DQF_GOES)
 	status=nf_close(ncid)	
@@ -236,12 +236,12 @@ SUBROUTINE read_GOES_DQF2(yyyymmdd,HHMM,GEOS_L2_DIR,DQF_GOES,AG)
 	INTEGER, DIMENSION(5424,5424), INTENT(OUT) ::  DQF_GOES	
 	LOGICAL, INTENT(OUT) :: AG
 	Integer status,ncid,varid
-	Character*255 :: filename
+	! Character*255 :: filename
 	AG=.TRUE.	
-	filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd// &
-	"/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
+	! filename=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd// &
+	! "/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HHMM//".NC"
 	
-    status=nf_open(trim(adjustl(filename)),nf_nowrite,ncid)	
+    status=nf_open(trim(adjustl(GEOS_L2_DIR)),nf_nowrite,ncid)	
 	status=nf_inq_varid (ncid, 'DQF', varid) 
 	status=nf_get_var_int(ncid,varid,DQF_GOES)
 	status=nf_close(ncid)	
@@ -258,9 +258,9 @@ END SUBROUTINE read_GOES_DQF2
 !
 !  p4.8.2 https://www.goes-r.gov/products/docs/PUG-L2+-vol5.pdf
 !
-SUBROUTINE get_SZA_GOESR_LonLat(lon,lat,x,y,FLAG)
+SUBROUTINE get_SZA_GOESR_LonLat(lambda16,lon,lat,x,y,FLAG)
   IMPLICIT NONE
-	REAL, INTENT(IN) :: lon,lat
+	REAL, INTENT(IN) :: lon,lat,lambda16
 	REAL, INTENT(OUT) :: x, y
 	
 	REAL :: lambda, phi
@@ -271,13 +271,14 @@ SUBROUTINE get_SZA_GOESR_LonLat(lon,lat,x,y,FLAG)
 	REAL, PARAMETER :: R_eq=6378137 ! m
 	REAL, PARAMETER :: R_pol=6356752.31414 ! m
 	REAL, PARAMETER :: invf= 298.257222096 
-	REAL, PARAMETER :: lambda0= -75.0/180.*PAI
+	REAL            :: lambda0
 	REAL, PARAMETER :: H0= 35786023 ! m
 	REAL, PARAMETER :: H = 42164160 ! R_eq+H0
 	REAL, PARAMETER :: e = 0.0818191910435
 
 	LOGICAL,INTENT(OUT) :: FLAG
 	
+	lambda0= lambda16/180.*PAI
 	phi= lat/180.*PAI
 	lambda=lon/180.*PAI
 	

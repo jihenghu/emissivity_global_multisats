@@ -15,9 +15,9 @@
 !!  TOC:
 !!  - Collocate TB and Clouds:
 !!    The clouds come from three GeoSats that cover the whole globe except for high-latitudes:
-!!		- Himawari-8/AHI over the Pacific Ocean 
+!!		- Himawari-8&9/AHI over the Pacific Ocean 
 !!	 	- GOES-16/ABI over the America
-!!	 	- MSG-1&2/SERV over the Indian Ocean
+!!	 	- MSG-1&2&3/SERV over the EU and Africa
 !!  - Collocate tb-cloud to ERA5 profiles and LST;
 !!  - Call RTTOV V13.2 to retrieve multichannel allsky emissivity:
 !! 	  Use the direct retrieving scheme porposed by (Baord et al., 2016), considering clearsky 
@@ -35,9 +35,10 @@
 !! 							DATA AVAILABLE RANGE 
 !!---------------------------------------------------------------------------------------------
 !! GMI L1C :  2014.03.04 - present, every orbits
-!! H-8 AHI L2CLP : 2015.07.04 - present, every 10-min  
+!! H-8/9 AHI L2CLP : 2015.07.04 - present, every 10-min  
 !! GOES-R ABI L2 Cloud : AWS (2019.339-present, 10-min)  CLASS/NCEI(2017.06.08-present) “hard”
 !! MSG1/2 indian sea : 2017.2.1 - present  ONLY Cloud Mask , 15-min 
+!! MSG3 0E : 2014.2.1 - present  ONLY Cloud Mask , 15-min 
 !! ERA5: 1-hour, 0.25-degree, 37-layer
 !! ============================================================================================
 
@@ -49,6 +50,7 @@
  INCLUDE 'subs/sub_download_ahi_l2c.f90'
  INCLUDE 'subs/sub_download_goesr_aws.f90'
  ! python 'subs/sub_download_msg_clm.py'
+ ! python 'subs/sub_download_msg3_clm.py'
  ! I/O
  INCLUDE 'subs/sub_read_gmi_l1c_vars.f90'
  INCLUDE 'subs/sub_read_land_sea_mask.f90'
@@ -82,11 +84,10 @@ PROGRAM main_clear_retrieve_landonly
   Implicit none
   CHARACTER(8) :: yyyymmdd
   CHARACTER(LEN=255) :: command
-  CHARACTER(LEN=255) :: TB_Clouds_OUTDIR ,TB_Clouds_FILENAME,PWD
-  CHARACTER(LEN=255) :: GMI_L1C_DIR,H8_L2CLP_DIR,GEOS_L2_DIR,MSG_CLM_DIR
-  INTEGER :: file_unit
+  CHARACTER(LEN=255) :: GMIL1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
+  INTEGER :: file_unit,text_unit
 !! read GMI Vars
-  INTEGER :: nscan, npixel, nchannel
+  INTEGER :: nscan, npixel, nchannel, GMIIO
   REAL*4, DIMENSION(:,:,:), ALLOCATABLE :: TB_swath,Emissivity_swath
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: Latitude, Longitude
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: ScanTime_swath
@@ -97,17 +98,19 @@ PROGRAM main_clear_retrieve_landonly
   REAL*4, DIMENSION(3602,1800):: LSM_GRD
 
 !! Himawari-8/GOES-R
-  !! CLOUD FLAG:: -1:sea 0:out_of_boundary, 1:Himawari-8, 2:GOES-R, 3: MSG1/2,
-  !!  4: H8 missing; 5: GOES missing; 6: MSG1/2 missing;
-  !!  7: H8 LZA degrad; 8: GOES LZA>65 degrad; 9: MSG LZA degrad
+  !! CLOUD FLAG:: -1:sea 0:out_of_boundary, 1:H8, 2:GOES-R, 3: MSG1,
+  !!  4: Himawari missing; 5: GOES missing; 6: MSG1/2/3 missing;
+  !!  7: H9; 8: MSG2; 9: MSG3
   INTEGER, DIMENSION(:,:), ALLOCATABLE  :: Cloud_Flag 
+  INTEGER  :: cldflgmsg 
 
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: Sea_Frac  !! 0-100%
   REAL*4, DIMENSION(:,:,:), ALLOCATABLE ::CFR_swath,Clear_swath,Miss_swath 
   
   CHARACTER*255 :: AHI_FILENAME,GOES_FILENAME,AHI_FULLPATH,MSG_FILENAME,MSG_FULLPATH
   CHARACTER*255 :: record,lostfile,error_read
- 
+  CHARACTER*3 :: HIMA
+  
   REAL*4, DIMENSION(2401) :: lat_h8,lon_h8
 
   INTEGER, DIMENSION(2401,2401) ::ctype 
@@ -117,7 +120,7 @@ PROGRAM main_clear_retrieve_landonly
 !! GOESR 
   REAL    :: xdeg,ydeg  !! rad
 
- 
+  CHARACTER*2 :: Mode
   INTEGER, DIMENSION(5424,5424)	:: CLM_GOES, DQF_CLM
 
   LOGICAL 						:: GOES_IN, A1, A2, A3, A4, A5, A6,A7
@@ -140,7 +143,7 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER*255 :: REC_MSG_STAMP,MSG_MISSING_STAMP,CURRENT_MSG_STAMP
   INTEGER,DIMENSION(3712,3712) :: CLM_MSG
   LOGICAL :: OK
-  REAL :: Lambda0
+  REAL :: Lambda0,lambda16
   INTEGER :: W,E,S,N, dum
  
 !! general
@@ -155,7 +158,7 @@ PROGRAM main_clear_retrieve_landonly
   INTEGER :: qaflag(16)
   
   INTEGER :: STATUS
-  LOGICAL :: EXISTS,FLAG_H8,FLAG_GOES,FLAG_MSG
+  LOGICAL :: EXISTS,EXISTSHDF,EXISTSTXT,FLAG_H8,FLAG_GOES,FLAG_MSG
   
 !! Local view zenith angle, LZA
   REAL, DIMENSION(:,:),ALLOCATABLE :: LZA_swath
@@ -167,7 +170,7 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER*2 :: HH1,HH2
   INTEGER :: UTC_hr1, UTC_hr2
   REAL    :: wt1,wt2
-
+  LOGICAL :: profIO,landIO
 
   INTEGER,PARAMETER :: nlon=1440, nlat=561,nlevel=29, ntime=1
   REAL,PARAMETER    :: egrid=0.25
@@ -192,38 +195,38 @@ PROGRAM main_clear_retrieve_landonly
   REAL, DIMENSION(:,:),ALLOCATABLE :: TB_land, Emissivity_land
   LOGICAL :: alive1, alive2, alive3
   !!! tmp
-
-
+  REAL, DIMENSION(:),ALLOCATABLE :: ScanTime_land,	LZA_land, Sea_land
+  INTEGER, DIMENSION(:),ALLOCATABLE :: Cloudflg_land
+  REAL, DIMENSION(:,:),ALLOCATABLE :: CFR_land,	Clear_land, Miss_land	
+			
   !! retreve 
-  CHARACTER*255 :: EMISS_OUT_DIR,EMISS_FILENAME
+  CHARACTER*255 :: EMISS_OUTDIR,EMISS_HDF5,EMISS_TEXT
   CHARACTER*7 :: samples
   INTEGER :: imonth
 
   Integer :: num_land,iland
   
-  logical :: REDO
+  logical :: REDO, HDF5
 ! ==================================================================================================
 !	 1. SET UP VARIABLES
 ! ==================================================================================================	 
-	!! present working Directory !! Very Important
-	PWD='/home/jihenghu/emissivity_research/retrieve_gmi_clear_opt/' 
 	
-	!! Directory to save GMI_L1C HDF files
-	GMI_L1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
-	H8_L2CLP_DIR = '/home/jihenghu/data00/data/AHI_L2CLP/'    
-	GEOS_L2_DIR = '/home/jihenghu/data00/data/GOES_R/'  
-	MSG_CLM_DIR='/home/jihenghu/data00/data/MSG_IODC_CLM/'
-	ERA5_DIR = '/home/jihenghu/data00/data/ERA5/'
+	!! Directory to save GMI_L1C HDF5 files
+	! GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
+	GMIL1C_DIR = '/nfs/nuke/jihenghu/GPM_L1C/gmi/'    
+	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
+	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
+	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
+	ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
     
-	!! OUTPUTs
-	TB_Clouds_OUTDIR = '/home/jihenghu/data00/data/GMI_Cloud_Collocation/'    
-    EMISS_OUT_DIR = '/home/jihenghu/data00/data/GMI_Emissivity_Clear_Landonly/'    
+	!! OUTPUTs 
+    EMISS_OUTDIR = '/home/jihenghu/data00/data_em/GMI_EMISSIVITY/'    
 	
-	REDO=.FALSE.  ! .True.!! redo retrieve or not?
+	REDO=.False.  ! .True.!! redo retrieve or not?
+	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
-	CALL system("mkdir -p  "//trim(TB_Clouds_OUTDIR))
-	CALL system("mkdir -p  "//trim(EMISS_OUT_DIR))
+	CALL system("mkdir -p  "//trim(EMISS_OUTDIR))
 	CALL system("mkdir -p  "//trim(ERA5_DIR))
 
   ! Check if a command-line argument is provided
@@ -234,30 +237,28 @@ PROGRAM main_clear_retrieve_landonly
 
   ! Get the date string from the command-line argument
   CALL GETARG(1, yyyymmdd)
-  IF (yyyymmdd<'20150704') THEN
-    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2015.07.04.'
+  IF (yyyymmdd<'20140407') THEN
+    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.04.07.'
     STOP
   END IF  
   
-  CALL system("mkdir -p  "//trim(TB_Clouds_OUTDIR)//"/"//yyyymmdd)
-  CALL system("mkdir -p  "//trim(EMISS_OUT_DIR)//"/"//yyyymmdd)
+  CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd)
   
 ! ==================================================================================================
 ! 	download GMI Files
 ! ==================================================================================================	 
 
   PRINT*,"Downloading GMI files of the day ......"
-  CALL download_GMI_L1C(yyyymmdd,GMI_L1C_DIR)
+  CALL download_GMI_L1C(yyyymmdd,GMIL1C_DIR)
   
-  ! Call the ls command to list HDF files in the directory
-  command ='ls '//TRIM(GMI_L1C_DIR)//yyyymmdd(1:4)//"/"//yyyymmdd(5:6)//yyyymmdd(7:8)//'/*.HDF5'&
+  ! Call the ls command to list HDF5 files in the directory
+  command ='ls '//TRIM(GMIL1C_DIR)//yyyymmdd(1:4)//"/"//yyyymmdd(5:6)//yyyymmdd(7:8)//'/*.HDF5'&
 			// '> filelists/gmi_filelist_'//yyyymmdd//'.txt' 
 
   CALL SYSTEM(command)
 
   ! Open a unit for reading the ls command output
   OPEN(NEWUNIT=file_unit, FILE='filelists/gmi_filelist_'//yyyymmdd//'.txt')
-
 
 !! ==================================================================================================
 !!  Loop over GMI File to retrieve
@@ -266,10 +267,12 @@ PROGRAM main_clear_retrieve_landonly
 176	READ(file_unit,'(A)',end=886) GMI_FILENAME
 
    	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
-	EMISS_FILENAME=trim(EMISS_OUT_DIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO."//trim(GMI_Sufix)//".HDF5"
+	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".txt"
  	!! decide to retrieve ??	
-	inquire(file=trim(EMISS_FILENAME), exist=EXISTS)
-	IF (EXISTS .AND. (.NOT.REDO)) THEN
+	inquire(file=trim(EMISS_HDF5), exist=EXISTSHDF)
+	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
+	IF ((EXISTSHDF.OR.EXISTSTXT) .AND. (.NOT.REDO)) THEN
 		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(GMI_Sufix)
 		GOTO 176
 	END IF
@@ -278,14 +281,16 @@ PROGRAM main_clear_retrieve_landonly
    !!		  read GMI Variables                   
    !! --------------------------------------------------------------------------------------------------	
     PRINT *, '├──> Read GMI file: 1C.GPM.GMI.XCAL2016-C.'//trim(GMI_Sufix)//".******.HDF5" 
-	! get HDF file Dimension
-	CALL get_GMI_primary_dims(GMI_FILENAME,nscan,npixel,nchannel)
-
+	! get HDF5 file Dimension
+	GMIIO=0
+	CALL get_GMI_primary_dims(GMI_FILENAME,nscan,npixel,nchannel,GMIIO)
+	IF (GMIIO.NE.0) goto 176
+	
 	! Call the subroutine to read data	
 	ALLOCATE(Latitude(npixel,nscan), Longitude(npixel,nscan), LZA_swath(npixel,nscan))	
 	ALLOCATE(TB_swath(nchannel,npixel,nscan), ScanTime_swath(npixel,nscan), ScanTime(nscan))	
-	CALL read_GMI_Vars(GMI_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel)
-	
+	CALL read_GMI_Vars(GMI_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel,GMIIO)
+	IF (GMIIO.NE.0) goto 176
 	!! read global 0.01deg land sea mask: land 0% - 25% (strict land) - 75% (coastal) - 100% strict sea
 	!! longitude[3602] -0.05 ~ 360.05  ; latitude[1800]  -89.95 ~ 89.95
 	CALL read_land_sea_mask("subs/IMERG_land_sea_mask.nc",LSM_GRD)
@@ -362,8 +367,10 @@ PROGRAM main_clear_retrieve_landonly
 		!! ------------------------------------------------------------------------------------------------
 		! PRINT*, lon, lat
 		IF((lon.gt.80 .and. lon .le. 180).OR.((lon.ge.-180 .and. lon .lt. -160))) goto 2878   !! go to H-8		
-		IF(lon.gt.-156 .and. lon .lt. 6) GOTO 9642     !! goto GOESR		
-		IF(lon.gt.-12 .and. lon .lt. 113 ) GOTO  8847       !! goto MSG				
+		IF(lon.gt.-156 .and. lon .lt. -10) then
+			if (yyyymmdd>'20170419') GOTO 9642     !! goto GOESR	
+		end if
+		IF(lon.gt.-67.5 .and. lon .lt. 113 ) GOTO  8847       !! goto MSG				
 		GOTO 8404 !! goto Hell, no geostationary satellite mission region
 		
 	    !! ----------------------------------------------------------------------------------------------
@@ -373,8 +380,12 @@ PROGRAM main_clear_retrieve_landonly
 2878    continue    		
 		
 		if (yyyymmdd<'20150704')  GOTO 8404
-		
-		AHI_FILENAME="NC_H08_"//yyyymmdd//"_"//HH//MM//"_L2CLP010_FLDK.02401_02401.nc" 
+		IF (yyyymmdd>'20221212') THEN
+			HIMA='H09'
+		ELSE 
+			HIMA='H08'
+		END IF
+		AHI_FILENAME="NC_"//HIMA//"_"//yyyymmdd//"_"//HH//MM//"_L2CLP010_FLDK.02401_02401.nc" 
 		 
 		IF (trim(AHI_FILENAME) .eq. trim(error_read)) then ! file with ill
 			Cloud_Flag(ipixel,iscan)=4                  
@@ -385,7 +396,7 @@ PROGRAM main_clear_retrieve_landonly
 		IF (trim(AHI_FILENAME) .ne. trim(record)) THEN 
 			record=AHI_FILENAME
 
-			AHI_FULLPATH=trim(H8_L2CLP_DIR)//yyyymmdd//'/'//HH//'/'//trim(AHI_FILENAME)
+			AHI_FULLPATH=trim(HIMA_DIR)//yyyymmdd//'/'//HH//'/'//trim(AHI_FILENAME)
 			inquire(file=trim(AHI_FULLPATH), exist=EXISTS) !! 去指定文件夹寻找
 
 			!! --------------------------------------------------------------------------
@@ -393,7 +404,7 @@ PROGRAM main_clear_retrieve_landonly
 			!! --------------------------------------------------------------------------
 			if (.not.EXISTS) then !!! 其实不用检查，wget -c -N 会自动给检查	
 				!! Not found, download
-				CALL download_AHI_L2CLP(yyyymmdd,HH,AHI_FILENAME,H8_L2CLP_DIR,status)
+				CALL download_AHI_L2CLP(yyyymmdd,HH,AHI_FILENAME,HIMA_DIR,status)
 				
 				!! error download, record the lost				
 				if(status.ne.0) then
@@ -413,7 +424,7 @@ PROGRAM main_clear_retrieve_landonly
 			endif
 			
 			!! --------------------------------------------------------------------------					
-			!! 				Read Himawari-8 Cloud Proprties
+			!! 				Read Himawari-8/9 Cloud Proprties
 			!! --------------------------------------------------------------------------
 			
 			CALL read_AHI_L2_cloud(AHI_FULLPATH,lat_h8,lon_h8,ctype,status) ! E80~-160; N60~-60  cer[um]  cth[km]
@@ -486,36 +497,54 @@ PROGRAM main_clear_retrieve_landonly
 		IF(Cloud_Flag(ipixel,iscan).eq. 4)  THEN			
 			GOTO 8847
 		END IF
-	
+		IF (HIMA.eq.'H08')  Cloud_Flag(ipixel,iscan)= 1
+		IF (HIMA.eq.'H09')  Cloud_Flag(ipixel,iscan)= 7
 		GOTO 8404
 		
 
 		
 		!!----------------------------------------------------------------------------------------------
 		!!  GOES-R Domain  
-		!!        NOTE: MSG data before 2020 is extremely hard to access upon order, 
+		!!        NOTE: GOESR data before 2020 can only be accessed upon order on NOAA CLASS, 
 		!!              AND one should be careful of the 15-min mode3 before 20190402	
 		!!        ONLY GOESR .gt. 20200101 from  AWS archive USED HERE!!!
 		!! 		FullDisk mode06 ( 10-min interval: 00,10,20,30,40,50 same as Himawari-8 )
 		!!        https://www.goes-r.gov/products/docs/PUG-L2+-vol5.pdf
 		!!   RESOLUTIONs (NADIR):: 56 urad (2 KM), 112 urad(4KM), 280 urad(10KM)
+		!!   nadir shit info: 20171214 from -89.5 to -75.2
 		!!----------------------------------------------------------------------------------------------
 ! GOES
 9642    continue 
-
-		IF(.NOT.(lon.gt.-156 .and. lon .lt. 6)) GOTO 8847		
-	    IF (yyyymmdd<'20200101') THEN
+			
+		IF(yyyymmdd.gt.'20190402') Mode='M6'
+		IF(yyyymmdd.lt.'20190402') Mode='M3'
+		IF(yyyymmdd.eq.'20190402') then
+			if (HH.lt.'16')	then
+				Mode='M3'
+			else
+				Mode='M6'
+			end if
+		END IF
+		
+		IF (Mode=='M3') WRITE(MM,'(i0.2)') int(int((stime-int(stime))*60)/15)*15  
+		IF (Mode=='M6') WRITE(MM,'(i0.2)') int(int((stime-int(stime))*60)/10)*10
+		
+		lambda16=-75.2
+		IF (yyyymmdd.lt.'20171214') lambda16=-89.5
+		
+		IF(.NOT.(lon.gt.-156 .and. lon .lt. -10)) GOTO 8847		
+	    IF (yyyymmdd<'20170419') THEN
 			Cloud_Flag(ipixel,iscan)=5
 			GOTO 8847  !! MSG has it
 		ENDIF
 		! print*,lon,lat
-		CALL get_SZA_GOESR_LonLat(lon,lat,xdeg,ydeg,GOES_IN)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,lat,xdeg,ydeg,GOES_IN)
 		IF (.NOT.GOES_IN) THEN
 			Cloud_Flag(ipixel,iscan)=0
 			GOTO 8847  ! MSG has it
 		END IF  !! outof GOES-R sight
 		
-		GOES_CUR_STMAP="STAMP_"//yyyymmdd//"_"//HH//MM
+		GOES_CUR_STMAP="G16_"//Mode//"_"//yyyymmdd//"_"//HH//MM
 		
 		IF (TRIM(GOES_CUR_STMAP).EQ.TRIM(GOES_MISS_STMAP)) THEN
 			Cloud_Flag(ipixel,iscan)=5
@@ -525,16 +554,22 @@ PROGRAM main_clear_retrieve_landonly
 		IF (TRIM(GOES_CUR_STMAP).NE. TRIM(GOES_REC_STMAP)) THEN  !! NEW file	
 			GOES_REC_STMAP=GOES_CUR_STMAP
 			
-			GOES_FILENAME=TRIM(GEOS_L2_DIR)//"/"//yyyymmdd//&
-					"/OR_ABI-L2-ACMF-M6_G16_"//yyyymmdd//"_"//HH//MM//".NC"
+			GOES_FILENAME=TRIM(GEOS_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd//&
+					"/OR_ABI-L2-ACMF-"//Mode//"_G16_"//yyyymmdd//"_"//HH//MM//".NC"
 			INQUIRE(FILE=TRIM(GOES_FILENAME), EXIST=EXISTS) !! 去指定文件夹寻找
-			IF (.NOT.EXISTS) THEN 			
-				!! ---------------------------------------------------------------------
-				!!    CALL Sub to download from Amazon Web Services S3 Cloud Bucket	
-				!! ---------------------------------------------------------------------
-				print*, '│  │  ├── GOES-R files downloading ......'				
-
-				CALL download_GOESR_AWS_all(yyyymmdd,HH,GEOS_L2_DIR)  !!! download for all day
+			IF (.NOT.EXISTS) THEN 
+				IF(yyyymmdd.gt.'20191231') THEN
+					!! ---------------------------------------------------------------------
+					!!    CALL Sub to download from Amazon Web Services S3 Cloud Bucket	
+					!! ---------------------------------------------------------------------
+					print*, '│  │  ├── GOES-R files downloading ......'				
+					CALL download_GOESR_AWS_all(yyyymmdd,HH,GEOS_DIR)  !!! download for all day
+				ELSE
+					PRINT*,"│  │  └── GOES file notfound, "//TRIM(GOES_FILENAME)
+					GOES_MISS_STMAP=GOES_CUR_STMAP
+					Cloud_Flag(ipixel,iscan)=5
+					GOTO 8847				
+				ENDIF
 			ELSE 
 				print*, '│  │  ├── GOES-R file aready exists, no downloading needed'
 			END IF
@@ -543,7 +578,7 @@ PROGRAM main_clear_retrieve_landonly
 			!!  Cloud Mask DIMENSION(5424,5424)
 			!!	-1: NaN; 0: clear;  1:cloudy
 			!! -------------------------------------------------------------------------	
-			CALL read_GOES_CLM(yyyymmdd,HH//MM,GEOS_L2_DIR,CLM_GOES,A1)
+			CALL read_GOES_CLM(yyyymmdd,HH//MM,TRIM(GOES_FILENAME),CLM_GOES,A1)
 				! print*,MinVal(CLM_GOES),MAXVAL(CLM_GOES)  
 				! print*,CLM_GOES(:20,1)
 
@@ -560,11 +595,11 @@ PROGRAM main_clear_retrieve_landonly
 			!!    5 degraded_due_to_failed_band_2_tests_qf 
 			!!    6 degraded_due_to_other_bad_bands_qf
 			!! --------------------------------------------------------------------------
-			CALL read_GOES_DQF2(yyyymmdd,HH//MM,GEOS_L2_DIR,DQF_CLM,A7)  	  
+			CALL read_GOES_DQF2(yyyymmdd,HH//MM,TRIM(GOES_FILENAME),DQF_CLM,A7)  	  
 				! PRINT*,MinVal(DQF_CLM),MAXVAL(DQF_CLM)
 
 			IF(.NOT.(A1.AND.A7)) THEN  !! SOME file MISSING
-				PRINT*,"│  │  └── READ GOES file error, skip ......"
+				PRINT*,"│  │  └── READ GOES file error: "//TRIM(GOES_FILENAME)
 				GOES_MISS_STMAP=GOES_CUR_STMAP
 				Cloud_Flag(ipixel,iscan)=5
 				GOTO 8847
@@ -589,10 +624,10 @@ PROGRAM main_clear_retrieve_landonly
 		latN=lat+0.25
 		latS=lat-0.25
 		
-		CALL get_SZA_GOESR_LonLat(lonW,lat,Wf,x0,FLAG1)
-		CALL get_SZA_GOESR_LonLat(lonE,lat,Ef,x0,FLAG2)
-		CALL get_SZA_GOESR_LonLat(lon,latN,x0,Nf,FLAG3)
-		CALL get_SZA_GOESR_LonLat(lon,latS,x0,Sf,FLAG4)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latS,x0,Sf,FLAG4)
 		
 		IF (.not.(FLAG1.OR.FLAG2.OR.FLAG3.OR.FLAG4)) THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -624,7 +659,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_GOES(W1,N1) .EQ. 1)  CFR_swath(:,ipixel,iscan)=100.	
 			
 			FLAG_GOES=.TRUE. 
-			CALL calc_LZA(lon,lat,-75.0,0.,angle)	
+			CALL calc_LZA(lon,lat,lambda16,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle
 			Cloud_Flag(ipixel,iscan)= 2				
 			GOTO 8404 
@@ -637,10 +672,10 @@ PROGRAM main_clear_retrieve_landonly
 		latN=lat+0.15
 		latS=lat-0.15
 		
-		CALL get_SZA_GOESR_LonLat(lonW,lat,Wf,x0,FLAG1)
-		CALL get_SZA_GOESR_LonLat(lonE,lat,Ef,x0,FLAG2)
-		CALL get_SZA_GOESR_LonLat(lon,latN,x0,Nf,FLAG3)
-		CALL get_SZA_GOESR_LonLat(lon,latS,x0,Sf,FLAG4)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latS,x0,Sf,FLAG4)
 		
 		IF (.not.(FLAG1.OR.FLAG2.OR.FLAG3.OR.FLAG4)) THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -674,7 +709,7 @@ PROGRAM main_clear_retrieve_landonly
 
 			Cloud_Flag(ipixel,iscan)= 2		
 	
-			CALL calc_LZA(lon,lat,-75.0,0.,angle)	
+			CALL calc_LZA(lon,lat,lambda16,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404
 		ENDIF
@@ -684,10 +719,10 @@ PROGRAM main_clear_retrieve_landonly
 		lonE=lon+0.08
 		latN=lat+0.08
 		latS=lat-0.08
-		CALL get_SZA_GOESR_LonLat(lonW,lat,Wf,x0,FLAG1)
-		CALL get_SZA_GOESR_LonLat(lonE,lat,Ef,x0,FLAG2)
-		CALL get_SZA_GOESR_LonLat(lon,latN,x0,Nf,FLAG3)
-		CALL get_SZA_GOESR_LonLat(lon,latS,x0,Sf,FLAG4)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
+		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
+		CALL get_SZA_GOESR_LonLat(lambda16,lon,latS,x0,Sf,FLAG4)
 		
 		IF (.not.(FLAG1.OR.FLAG2.OR.FLAG3.OR.FLAG4)) THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -720,7 +755,7 @@ PROGRAM main_clear_retrieve_landonly
 		!! Marked as Went Through a GOES-R collocation
 	
 		Cloud_Flag(ipixel,iscan)= 2		
-		CALL calc_LZA(lon,lat,-75.0,0.,angle)	
+		CALL calc_LZA(lon,lat,lambda16,0.,angle)	
 		LZA_swath(ipixel, iscan) = 	angle			
 		FLAG_GOES=.TRUE.  
 		
@@ -733,32 +768,54 @@ PROGRAM main_clear_retrieve_landonly
 		!!  Instrument replace Warning: 
 		!!    2022.06.01, Meteosat-9 (45.5°E) replaced Meteosat-8(41.5° E) to provide data
 		!!    20220601 8:45(MSG1) -> 20220601 09:00(MSG2)
+		!!    
+		!!   2018-02-20 (09:00) 	MSG4				
+		!!   2018-02-20 (08:45) 	MSG3		
 		!!----------------------------------------------------------------------------------------------
 ! MSG   WE have only one variable to deal with, ie., CLM		
 8847    CONTINUE 	
 
 				
-		IF(.NOT.(lon.gt.-30 .and. lon .lt. 130) ) GOTO 8404  !! no one want you here, middle pacific!!
-		IF(yyyymmdd<'20170201') THEN
+		IF(.NOT.(lon.gt.-67.5 .and. lon .lt. 113) ) GOTO 8404  !! out of MSG domain
+		IF(yyyymmdd<'20140101') THEN
 			Cloud_Flag(ipixel,iscan)=0
 			GOTO 8404
 		END IF
 
+
 		IF (yyyymmdd<'20220601') MSGSAT='MSG1'
 		IF (yyyymmdd>'20220601') MSGSAT='MSG2'
+		IF (yyyymmdd<'20170201') THEN
+			MSGSAT='MSG3'
+			IF(lon.gt.67.5) goto 8404
+		END IF
+		
+		IF (lon.lt.-20 .and. lon.gt.-67) then
+			IF (yyyymmdd>'20170201'.and. yyyymmdd<'20170608') then
+				MSGSAT='MSG3'
+			ENDIF
+		ENDIF
+			
 		IF (yyyymmdd.eq.'20220601') THEN
-			IF(HH//MM15.lt.'0850') THEN
+			IF(HH.lt.'09') THEN
 				MSGSAT='MSG1'
 			ELSE
 				MSGSAT='MSG2'
 			END IF
 		END IF
-
+		
 		IF (MSGSAT.EQ.'MSG1') then
 			Lambda0= 41.5
+			cldflgmsg=3
 		ELSE IF (MSGSAT.EQ.'MSG2') THEN
 			Lambda0= 45.5
-		ELSE 
+			cldflgmsg=8
+		ELSE IF (MSGSAT.EQ.'MSG3') THEN
+			Lambda0= 0
+			cldflgmsg=9
+		ELSE IF (MSGSAT.EQ.'MSG4') THEN
+			Lambda0= 0
+		ELSE
 			PRINT*, "│  │  └── ERROR: Un—Specified MSG satellite: ", MSGSAT
 			Cloud_Flag(ipixel,iscan)=6
 			GOTO 8404 
@@ -777,18 +834,22 @@ PROGRAM main_clear_retrieve_landonly
 			REC_MSG_STAMP=CURRENT_MSG_STAMP
 			
 			!!! search the file to open
-			MSG_FULLPATH=TRIM(MSG_CLM_DIR)//yyyymmdd//'/'//MSGSAT// &
+			MSG_FULLPATH=TRIM(MSG_DIR)//yyyymmdd//'/'//MSGSAT// &
 					'-SEVI-MSGCLMK-0100-0100-'//yyyymmdd//HH//MM15//'00.000000000Z-NA.grb'
 			INQUIRE(FILE=TRIM(MSG_FULLPATH), EXIST=EXISTS) 
 			! PRINT*,TRIM(MSG_FULLPATH)
 			IF (.NOT.EXISTS) THEN 
-				PRINT*,"│  │  ├── New MSG1/2 download needed"
+				PRINT*,"│  │  ├── New MSG1/2/3 download needed"
 				!! -----------------------------------------------------------------------------------
 				!! Call python script to download from EUMETSAT DC  :: pip(>3.7) install eumdac
 				!! -----------------------------------------------------------------------------------
-				CALL SYSTEM("python3.9 subs/sub_download_msg_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_CLM_DIR))			
+			  IF(MSGSAT.EQ.'MSG3') THEN
+				CALL SYSTEM("python3.9 subs/sub_download_msg3_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_DIR))			
+			  ELSE
+				CALL SYSTEM("python3.9 subs/sub_download_msg_clm.py "//yyyymmdd//" "//HH//MM15//" "//trim(MSG_DIR))			
+			  END IF
 			ELSE
-				PRINT*,"│  │  ├── OLD MSG1/2 Found, no download needed"
+				PRINT*,"│  │  ├── OLD MSG1/2/3 Found, no download needed"
 			END IF
 			!! --------------------------------------------------------------------------------------
 			!!	 CLOUD MASK :  Code table 4.217
@@ -800,9 +861,10 @@ PROGRAM main_clear_retrieve_landonly
 			!!! or -L/home/jihenghu/eccodes/lib64/  -leccodes_f90 -leccodes  -I/home/jihenghu/eccodes/include/
 			CLM_MSG=-1
 			! print*,"HERE0", MSG_FULLPATH
-			CALL read_MSG_CLM(MSG_FULLPATH,CLM_MSG)	
+
+			CALL read_MSG_CLM(MSG_FULLPATH,CLM_MSG,status)	
 			
-			IF (MINVAL(CLM_MSG)<0.and.MAXVAL(CLM_MSG)<0) THEN         
+			IF (status.NE.0 .OR.(MINVAL(CLM_MSG)<0.and.MAXVAL(CLM_MSG)<0)) THEN         
 				PRINT*,"│  │  └── READ MSG CLOUD ERROR**:", TRIM(CURRENT_MSG_STAMP)
 				MSG_MISSING_STAMP=CURRENT_MSG_STAMP
 				Cloud_Flag(ipixel,iscan)=6				    
@@ -868,7 +930,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(:,ipixel,iscan)=100.	
 					
 			FLAG_GOES=.TRUE. 
-			Cloud_Flag(ipixel,iscan)= 3
+			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404 
@@ -908,7 +970,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(2:3,ipixel,iscan)=100.	
 					
 			FLAG_GOES=.TRUE. 
-			Cloud_Flag(ipixel,iscan)= 3
+			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404 
@@ -947,7 +1009,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(3,ipixel,iscan)=100.	
 					
 			FLAG_GOES=.TRUE. 
-			Cloud_Flag(ipixel,iscan)= 3
+			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
 			GOTO 8404 
@@ -955,7 +1017,7 @@ PROGRAM main_clear_retrieve_landonly
 
 		!!! Marked as Went Through a MSG collocation
 		FLAG_MSG=.TRUE.
-		Cloud_Flag(ipixel,iscan)= 3	
+		Cloud_Flag(ipixel,iscan)= cldflgmsg		
 		CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 		LZA_swath(ipixel, iscan) = 	angle	
 		!!----------------------------------------------------------------------------------------------
@@ -985,16 +1047,16 @@ PROGRAM main_clear_retrieve_landonly
 	!! operate in 1D londonly pixel
 	
 	ALLOCATE(pixelid(num_land),scanid(num_land) )		
-	ALLOCATE(LST_land(num_land), Psrf_land(num_land), T2m_land(num_land), SnowC_land(num_land), SMC_land(num_land) )	
+	ALLOCATE(LST_land(num_land), Psrf_land(num_land), T2m_land(num_land), SnowC_land(num_land), SMC_land(num_land))	
 
 	ALLOCATE(Vapor_land(nlevel,num_land),AirTemp_land(nlevel,num_land))!,rh(nlevel,npixel,nscan)		
 
 	ALLOCATE(TB_land(nchannel,num_land))
 
 	ALLOCATE(Longitude_land(num_land),Latitude_land(num_land))
-		
-	ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
-	Emissivity_swath=-999.9		
+	ALLOCATE(ScanTime_land(num_land),LZA_land(num_land),Sea_land(num_land),Cloudflg_land(num_land))
+	ALLOCATE(CFR_land(3,num_land),Clear_land(3,num_land),Miss_land(3,num_land))
+	
 	ALLOCATE(Emissivity_land(nchannel,num_land))
 		Emissivity_land=0.0
 	
@@ -1022,6 +1084,14 @@ PROGRAM main_clear_retrieve_landonly
 			TB_land(:,iland)=TB_swath(:,ipixel,iscan)
 			Longitude_land(iland)=Longitude(ipixel,iscan)
 			Latitude_land(iland) =Latitude(ipixel,iscan)
+			ScanTime_land(iland)=ScanTime(iscan)
+			LZA_land(iland)=LZA_swath(ipixel,iscan)
+			Sea_land(iland)=Sea_Frac(ipixel,iscan)		
+			Cloudflg_land(iland)=Cloud_Flag(ipixel,iscan)
+			
+			CFR_land(:,iland)=CFR_swath(:,ipixel,iscan)
+			Clear_land(:,iland)=Clear_swath(:,ipixel,iscan)
+			Miss_land(:,iland)=Miss_swath(:,ipixel,iscan)
 			
 			stime=ScanTime(iscan)     !! 0.33 hr    23:45  
 			UTC_hr1=int(stime)        !!  0 hr      23      
@@ -1053,7 +1123,7 @@ PROGRAM main_clear_retrieve_landonly
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_profiles.py "//&
+					call system("python3 subs/era5/download_era5_profiles.py "//&
 								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Plevels file found for HR1: ",HH1,":00. Extracting vars....."
@@ -1061,14 +1131,16 @@ PROGRAM main_clear_retrieve_landonly
 				
 				if (.not.alive2) then 
 					print*, "│  │  ├── ERA5-Land file Not Found, calling Python downloading script....."	
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_lands.py "//&
+					call system("python3 subs/era5/download_era5_lands.py "//&
 								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR1: ",HH1,":00. Extracting vars....."					
 				end if
 								
-				call read_ERA5_profiles(trim(req_era5_hr1),elon,elat,qw1,ta1)
-				call read_ERA5_landvars(trim(req_land_hr1),lst1,psrf1,t2m1,snowc1,smc1)        !! K, hPa, K     !!  1 (top) -> 29 (bottom)
+				call read_ERA5_profiles(trim(req_era5_hr1),elon,elat,qw1,ta1,profIO)
+				call read_ERA5_landvars(trim(req_land_hr1),lst1,psrf1,t2m1,snowc1,smc1,landIO)        !! K, hPa, K     !!  1 (top) -> 29 (bottom)
+				
+				IF (.NOT.(profIO.and.landIO)) goto 1505
 				
 				where(qw1.eq.0) qw1=1E-9			
 			END IF
@@ -1086,21 +1158,24 @@ PROGRAM main_clear_retrieve_landonly
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_profiles.py "//&
+					call system("python3 subs/era5/download_era5_profiles.py "//&
 								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Plevels file found for HR2: ",HH2,":00. Extracting vars....."
 				end if
 				if (.not.alive2) then 
 					print*, "│  │  ├── ERA5-Land file Not Found, calling Python downloading script....."	
-					call system("python3 "//trim(adjustl(PWD))//"/subs/era5/download_era5_lands.py "//&
+					call system("python3 subs/era5/download_era5_lands.py "//&
 								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR) )
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR2: ",HH2,":00. Extracting vars....."					
 				end if
 							
-				call read_ERA5_profiles(trim(req_era5_hr2),elon,elat,qw2,ta2)
-				call read_ERA5_landvars(trim(req_land_hr2),lst2,psrf2,t2m2,snowc1,smc2)
+				call read_ERA5_profiles(trim(req_era5_hr2),elon,elat,qw2,ta2,profIO)
+				call read_ERA5_landvars(trim(req_land_hr2),lst2,psrf2,t2m2,snowc1,smc2,landIO)
+				
+				IF (.NOT.(profIO.and.landIO)) goto 1505
+				
 				where(qw2.eq.0) qw2=1E-9	
 				
 			END IF
@@ -1140,9 +1215,6 @@ PROGRAM main_clear_retrieve_landonly
 	print*, "├──RTTOV retrieve begining, total samples= "//samples
 	! channel 10.65 
 	print*, "├──── Start RTTOV retrieve Channel 1-2 ......."
-	
-	! print*,maxVal(Emissivity_swath),minVal(Emissivity_swath)
-	! print*,maxVal(Emissivity_land),minVal(Emissivity_land)
 
 	call rttov_retrieve_gmi_emiss_clearsky(imonth,nlevel,num_land,2,52.8,(/1,2/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
@@ -1179,7 +1251,7 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(9,:)=-999.9
 	ENDWHERE
 		
-	WHERE(LST_land.le.10)
+	WHERE(LST_land.le.10 .or. LZA_land.lt.0)
 		Emissivity_land(1,:)=-999.9
 		Emissivity_land(2,:)=-999.9
 		Emissivity_land(3,:)=-999.9
@@ -1194,66 +1266,111 @@ PROGRAM main_clear_retrieve_landonly
 
 	WHERE(Emissivity_land.eq.-1 ) Emissivity_land=-999.9
 
-	!! reorgnize
-	
-	Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan),SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
-		LST_swath  = -999.9
-		T2m_swath  = -999.9
-		SnowC_swath= -999.9
-		SMC_swath	 = -999.9
-	
-	DO iland=1,num_land
-		iscan=scanid(iland)
-		ipixel=pixelid(iland)
-		Emissivity_swath(:,ipixel,iscan)=Emissivity_land(:,iland)
-		LST_swath(ipixel,iscan)  = LST_land(iland)
-		T2m_swath(ipixel,iscan)  = T2m_land(iland)
-		SnowC_swath(ipixel,iscan)= SnowC_land(iland)
-		SMC_swath(ipixel,iscan)	 = SMC_land(iland)
-	END DO
+	!! reorgnize for HDF5 output
+	IF (HDF5) THEN
+		ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
+		Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan))
+		Allocate(SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
+			LST_swath  = -999.9
+			T2m_swath  = -999.9
+			SnowC_swath= -999.9
+			SMC_swath  = -999.9
+			Emissivity_swath=-999.9	
+			
+		DO iland=1,num_land
+			iscan=scanid(iland)
+			ipixel=pixelid(iland)
+			Emissivity_swath(:,ipixel,iscan)=Emissivity_land(:,iland)
+			LST_swath(ipixel,iscan)  = LST_land(iland)
+			T2m_swath(ipixel,iscan)  = T2m_land(iland)
+			SnowC_swath(ipixel,iscan)= SnowC_land(iland)
+			SMC_swath(ipixel,iscan)	 = SMC_land(iland)
+		END DO
 
 
 
-	WHERE(Miss_swath(1,:,:).ge.99)
-		Emissivity_swath(1,:,:)=-999.9
-		Emissivity_swath(2,:,:)=-999.9
-	ENDWHERE
-	
-	WHERE(Miss_swath(2,:,:).ge.99)	
-		Emissivity_swath(3,:,:)=-999.9
-		Emissivity_swath(4,:,:)=-999.9
-		Emissivity_swath(5,:,:)=-999.9
-		Emissivity_swath(6,:,:)=-999.9
-		Emissivity_swath(7,:,:)=-999.9
-	ENDWHERE
-	
-	WHERE(Miss_swath(3,:,:).ge.99)
-		Emissivity_swath(8,:,:)=-999.9
-		Emissivity_swath(9,:,:)=-999.9
-	ENDWHERE
+		WHERE(Miss_swath(1,:,:).ge.99)
+			Emissivity_swath(1,:,:)=-999.9
+			Emissivity_swath(2,:,:)=-999.9
+		ENDWHERE
 		
+		WHERE(Miss_swath(2,:,:).ge.99)	
+			Emissivity_swath(3,:,:)=-999.9
+			Emissivity_swath(4,:,:)=-999.9
+			Emissivity_swath(5,:,:)=-999.9
+			Emissivity_swath(6,:,:)=-999.9
+			Emissivity_swath(7,:,:)=-999.9
+		ENDWHERE
+		
+		WHERE(Miss_swath(3,:,:).ge.99)
+			Emissivity_swath(8,:,:)=-999.9
+			Emissivity_swath(9,:,:)=-999.9
+		ENDWHERE
+	END IF	
   ! --------------------------------------------------------------------------
   ! 5. output Retrieve result
   ! --------------------------------------------------------------------------
+	! output to ascci text
+	
+	WHERE(Miss_land(1,:).ge.99)
+		Emissivity_land(1,:)=-999.9
+		Emissivity_land(2,:)=-999.9
+	ENDWHERE
+	
+	WHERE(Miss_land(2,:).ge.99)	
+		Emissivity_land(3,:)=-999.9
+		Emissivity_land(4,:)=-999.9
+		Emissivity_land(5,:)=-999.9
+		Emissivity_land(6,:)=-999.9
+		Emissivity_land(7,:)=-999.9
+	ENDWHERE
+	
+	WHERE(Miss_land(3,:).ge.99)
+		Emissivity_land(8,:)=-999.9
+		Emissivity_land(9,:)=-999.9
+	ENDWHERE
+	
+	open(NEWUNIT=text_unit,file=trim(adjustL(EMISS_TEXT)))
+	DO iland=1,num_land
+		
+		iscan=scanid(iland)
+		ipixel=pixelid(iland)
 
-	CALL write_emiss_hdf5(trim(adjustL(EMISS_FILENAME)),nchannel,npixel,nscan, &
-			Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
-			LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
-			LZA_swath,CFR_swath,Clear_swath,&
-			Sea_Frac,Cloud_Flag,Miss_swath,status)
+		write(text_unit,505) nscan,npixel,iscan,ipixel,Longitude_land(iland),Latitude_land(iland),&
+			ScanTime_land(iland),Emissivity_land(:,iland),TB_land(:,iland),&
+			LST_land(iland),T2m_land(iland),SnowC_land(iland),SMC_land(iland), &
+			LZA_land(iland),CFR_land(:,iland),Clear_land(:,iland),Miss_land(:,iland),&
+			Sea_land(iland),Cloudflg_land(iland)
 	
-	IF(status/=0) THEN
-		PRINT*,"└── Write emissivity HDF error : ",trim(adjustL(EMISS_FILENAME))
-		Stop
-	ENDIF		 
-	PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_FILENAME))
+	END DO	
+	PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_TEXT))
+505 format(4I6, 3f10.4, 18f10.4, 5f10.4, 10f10.4, I6)
 	
+	close(text_unit)
+	
+	IF (HDF5) THEN
+		CALL write_emiss_hdf5(trim(adjustL(EMISS_HDF5)),nchannel,npixel,nscan, &
+				Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
+				LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
+				LZA_swath,CFR_swath,Clear_swath,&
+				Sea_Frac,Cloud_Flag,Miss_swath,status)
+		
+		IF(status/=0) THEN
+			PRINT*,"└── Write emissivity HDF5 error : ",trim(adjustL(EMISS_HDF5))
+			Stop
+		ENDIF		 
+		PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_HDF5))
+	END IF	
   ! --------------------------------------------------------------------------
   ! 6. free memory
   ! --------------------------------------------------------------------------	
-	! Deallocate(ERA5)
-	DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
-	DEALLOCATE(Emissivity_swath)
+
+	IF (HDF5) THEN
+		DEALLOCATE(LST_swath, T2m_swath, SnowC_swath, SMC_swath)	
+		DEALLOCATE(Emissivity_swath)
+	END IF	
+
+1505 continue	
 	DEALLOCATE(pixelid,scanid)
 	
 	DEALLOCATE(LST_land, Psrf_land, T2m_land, SnowC_land, SMC_land)	
@@ -1262,6 +1379,9 @@ PROGRAM main_clear_retrieve_landonly
 	DEALLOCATE(Emissivity_land)
 	DEALLOCATE(TB_land)
 	DEALLOCATE(Longitude_land,Latitude_land)
+
+	DEALLOCATE(ScanTime_land,LZA_land,Sea_land,Cloudflg_land)
+	DEALLOCATE(CFR_land,Clear_land,Miss_land)
 	
 2333 Continue
 		
@@ -1279,9 +1399,6 @@ PROGRAM main_clear_retrieve_landonly
 	! Close the filelist
 	CLOSE(file_unit)
 	
-	!! remove goesr
-	! call system("cd "//trim(GEOS_L2_DIR)//"/"//yyyymmdd//" ; rm -r *")
-
 END PROGRAM main_clear_retrieve_landonly
 
 

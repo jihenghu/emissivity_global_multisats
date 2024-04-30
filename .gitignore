@@ -5,6 +5,10 @@
 *.hdf5
 *.txt
 *.log
+*.png
+*.jpg
+*.ps
+*.HDF5
 
 logs/
 filelists/
