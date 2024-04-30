@@ -212,7 +212,8 @@ PROGRAM main_clear_retrieve_landonly
 ! ==================================================================================================	 
 	
 	!! Directory to save GMI_L1C HDF5 files
-	GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
+	! GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
+	GMIL1C_DIR = '/nfs/nuke/jihenghu/GPM_L1C/gmi/'    
 	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
