@@ -217,7 +217,8 @@ PROGRAM main_clear_retrieve_landonly
 	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
-	ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
+	! ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
+	ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
     
 	!! OUTPUTs 
     EMISS_OUTDIR = '/home/jihenghu/data00/data_em/GMI_EMISSIVITY/'    
@@ -226,8 +227,6 @@ PROGRAM main_clear_retrieve_landonly
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
-	CALL system("mkdir -p  "//trim(EMISS_OUTDIR))
-	CALL system("mkdir -p  "//trim(ERA5_DIR))
 
   ! Check if a command-line argument is provided
   IF (COMMAND_ARGUMENT_COUNT() /= 1) THEN
@@ -242,7 +241,10 @@ PROGRAM main_clear_retrieve_landonly
     STOP
   END IF  
   
-  CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd)
+  CALL system("mkdir -p  "//trim(EMISS_OUTDIR))  
+  CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd)
+  ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
+  CALL system("mkdir -p  "//trim(ERA5_DIR)) 
   
 ! ==================================================================================================
 ! 	download GMI Files
@@ -267,8 +269,10 @@ PROGRAM main_clear_retrieve_landonly
 176	READ(file_unit,'(A)',end=886) GMI_FILENAME
 
    	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
-	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".HDF5"
-	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".txt"
+	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."&
+				//trim(GMI_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."&
+				//trim(GMI_Sufix)//".txt"
  	!! decide to retrieve ??	
 	inquire(file=trim(EMISS_HDF5), exist=EXISTSHDF)
 	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
