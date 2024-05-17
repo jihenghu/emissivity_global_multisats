@@ -218,6 +218,7 @@ PROGRAM main_clear_retrieve_landonly
 	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
 	ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
+	! ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
     
 	!! OUTPUTs 
     EMISS_OUTDIR = '/home/jihenghu/data00/data_em/GMI_EMISSIVITY/'    
@@ -226,8 +227,6 @@ PROGRAM main_clear_retrieve_landonly
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 ! ==================================================================================================
-	CALL system("mkdir -p  "//trim(EMISS_OUTDIR))
-	CALL system("mkdir -p  "//trim(ERA5_DIR))
 
   ! Check if a command-line argument is provided
   IF (COMMAND_ARGUMENT_COUNT() /= 1) THEN
@@ -242,7 +241,13 @@ PROGRAM main_clear_retrieve_landonly
     STOP
   END IF  
   
-  CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd)
+  CALL system("mkdir  filelists")  
+  CALL system("mkdir  logs") 
+  
+  CALL system("mkdir -p  "//trim(EMISS_OUTDIR))  
+  CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd)
+  ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
+  CALL system("mkdir -p  "//trim(ERA5_DIR)) 
   
 ! ==================================================================================================
 ! 	download GMI Files
@@ -267,8 +272,10 @@ PROGRAM main_clear_retrieve_landonly
 176	READ(file_unit,'(A)',end=886) GMI_FILENAME
 
    	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
-	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".HDF5"
-	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."//trim(GMI_Sufix)//".txt"
+	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."&
+				//trim(GMI_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."&
+				//trim(GMI_Sufix)//".txt"
  	!! decide to retrieve ??	
 	inquire(file=trim(EMISS_HDF5), exist=EXISTSHDF)
 	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
@@ -538,8 +545,17 @@ PROGRAM main_clear_retrieve_landonly
 			GOTO 8847  !! MSG has it
 		ENDIF
 		! print*,lon,lat
+		
+		! lambda17=-137.0
 		CALL get_SZA_GOESR_LonLat(lambda16,lon,lat,xdeg,ydeg,GOES_IN)
 		IF (.NOT.GOES_IN) THEN
+			! IF (yyyymmdd>'20211201') then
+				! CALL get_SZA_GOESR_LonLat(lambda17,lon,lat,xdeg,ydeg,GOES_IN)
+				! IF (GOES_IN) THEN
+					! USE_GOESW=.True.
+				! END IF
+			! END IF
+			
 			Cloud_Flag(ipixel,iscan)=0
 			GOTO 8847  ! MSG has it
 		END IF  !! outof GOES-R sight
@@ -929,7 +945,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 1.OR. CLM_MSG(W,N) .EQ. 0)  Clear_swath(:,ipixel,iscan)=100.						   
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(:,ipixel,iscan)=100.	
 					
-			FLAG_GOES=.TRUE. 
+			FLAG_MSG=.TRUE. 
 			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
@@ -969,7 +985,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 1.OR. CLM_MSG(W,N) .EQ. 0)  Clear_swath(2:3,ipixel,iscan)=100.						   
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(2:3,ipixel,iscan)=100.	
 					
-			FLAG_GOES=.TRUE. 
+			FLAG_MSG=.TRUE. 
 			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
@@ -1008,7 +1024,7 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 1.OR. CLM_MSG(W,N) .EQ. 0)  Clear_swath(3,ipixel,iscan)=100.						   
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(3,ipixel,iscan)=100.	
 					
-			FLAG_GOES=.TRUE. 
+			FLAG_MSG=.TRUE. 
 			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
@@ -1124,7 +1140,7 @@ PROGRAM main_clear_retrieve_landonly
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
 					call system("python3 subs/era5/download_era5_profiles.py "//&
-								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR) )
+								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR))
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Plevels file found for HR1: ",HH1,":00. Extracting vars....."
 				end if
@@ -1132,7 +1148,7 @@ PROGRAM main_clear_retrieve_landonly
 				if (.not.alive2) then 
 					print*, "│  │  ├── ERA5-Land file Not Found, calling Python downloading script....."	
 					call system("python3 subs/era5/download_era5_lands.py "//&
-								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR) )
+								yyyymmdd//" "//HH1//" "//trim(ERA5_DIR))
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR1: ",HH1,":00. Extracting vars....."					
 				end if
@@ -1159,14 +1175,14 @@ PROGRAM main_clear_retrieve_landonly
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
 					call system("python3 subs/era5/download_era5_profiles.py "//&
-								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR) )
+								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR))
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Plevels file found for HR2: ",HH2,":00. Extracting vars....."
 				end if
 				if (.not.alive2) then 
 					print*, "│  │  ├── ERA5-Land file Not Found, calling Python downloading script....."	
 					call system("python3 subs/era5/download_era5_lands.py "//&
-								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR) )
+								yyyymmdd//" "//HH2//" "//trim(ERA5_DIR))
 				ELSE
 					PRINT*, "│  │  ├── Old ERA5-Land file found for HR2: ",HH2,":00. Extracting vars....."					
 				end if

@@ -1,15 +1,19 @@
 #%%
+import logging
 import sys  
 import os
 import cdsapi
+
 if len(sys.argv) <= 1:
     print("ERA5-download-No sufficent args!")
     exit()
 else:
     print("--------- Start download ERA5-PL-"+sys.argv[1]+"_utc_"+sys.argv[2]+"00.nc ------------------------------")
 
+
+# logging.basicConfig(level=logging.ERROR)
 # 将标准输出重定向到空设备
-sys.stdout = open('/dev/null', 'w')
+# sys.stdout = open('/dev/null', 'w')
 
 yyyymmdd= sys.argv[1]
 UTC= sys.argv[2]

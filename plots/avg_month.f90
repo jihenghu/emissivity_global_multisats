@@ -1,6 +1,6 @@
 
 use HDF5
-character*6 yyyymm
+character yyyymm*6, mm*2
 character*255 filename
 integer file_unit
 
@@ -9,7 +9,7 @@ real flon,flat,scantime,sea,lza,lst,t2m,snow,smc
 real emiss(9),tb(9)
 real cfr(3),clear(3),miss(3)
 
-integer,parameter ::  nlon=1441, nlat=721
+integer,parameter ::  nlon=1440, nlat=720
 Real mlse(nlon,nlat,9), longitude(nlon,nlat), latitude(nlon,nlat)
 integer ngrid(nlon,nlat,9)
 
@@ -34,10 +34,10 @@ mlse=0.0
 ngrid=0
 is=0
 
-yyyymm="201807"
-call system("ls /home/jihenghu/data00/data_em/GMI_EMISSIVITY/"//yyyymm//"??/*.txt > avg_month/filelist."//yyyymm//".txt")
+mm="07"
+call system("ls /home/jihenghu/data00/data_em/GMI_EMISSIVITY/20??/20??"//mm//"??/*.txt > filelist.month"//mm//".txt")
 
-open(21, file="avg_month/filelist."//yyyymm//".txt")
+	open(21, file="filelist.month"//mm//".txt")
 
 177 read(21,'(A)', end=404) filename
 	print*, trim(filename)
@@ -46,10 +46,12 @@ open(21, file="avg_month/filelist."//yyyymm//".txt")
 	open(NEWUNIT=file_unit, file=trim(filename))	
 176 read(file_unit,505, end=1001) nscan,npixel,iscan,ipixel,flon,flat,scantime,&
 			emiss,tb,lst,t2m,snow,smc, lza,cfr,clear,miss,sea,cloudflg
-	ilon=nint((flon+180.125)/0.25)+1
-	ilat=nint((90.125-flat)/0.25)+1
+	IF (flon>=180.or.flat<=-90) goto 176
+	IF (flon<-180.or.flat>90) goto 176
+	ilon=int((flon+180)/0.25)+1
+	ilat=int((90-flat)/0.25)+1
 	do ifr=1,9
-		if(emiss(ifr).lt.0.or. emiss(ifr).gt.1.05 ) cycle
+		if(emiss(ifr).lt.0.or. emiss(ifr).gt.1.2 ) cycle
 		mlse(ilon,ilat,ifr)=mlse(ilon,ilat,ifr)+emiss(ifr)
 		ngrid(ilon,ilat,ifr)=ngrid(ilon,ilat,ifr)+1
 	end do
@@ -57,22 +59,25 @@ open(21, file="avg_month/filelist."//yyyymm//".txt")
 	goto 176 !! another record line
 505 format(4I6, 3f10.4, 18f10.4, 5f10.4, 10f10.4, I6)	
 	
-1001 continue	 
+1001 continue
+	close(file_unit)	 
 	goto 177 !! another file
 
 404 continue 
+	close(21)
 
 	where(ngrid>0) mlse=mlse/ngrid
-	
+	where(ngrid<0.5) mlse=-999
+
 	do ilon=1,nlon
-		longitude(ilon,:)=-180+(ilon-1)*0.25
+		longitude(ilon,:)=-179.875+(ilon-1)*0.25
 	end do
 	do ilat=1,nlat
-		latitude(:,ilat)=90-(ilat-1)*0.25
+		latitude(:,ilat)=89.875-(ilat-1)*0.25
 	end do
 	
 
-	hdfname="GMI_Emissivity_Monthly_"//yyyymm//".HDF5"
+	hdfname="GMI_Emissivity_multiyear_"//mm//".HDF5"
 
 	data_dims3 =(/nlon,nlat,9/)
 	! Initialize Fortran interface
@@ -80,15 +85,15 @@ open(21, file="avg_month/filelist."//yyyymm//".txt")
 	CALL h5fcreate_f(trim(adjustl(hdfname)), H5F_ACC_TRUNC_F, file_id, status)	    
 	
 	CALL h5screate_simple_f(3, data_dims3, dspace_id, status)  	  	  
-	CALL h5dcreate_f(file_id,"Emissivity", H5T_NATIVE_REAL, dspace_id,dset_id, status)
+	CALL h5dcreate_f(file_id,"emissivity", H5T_NATIVE_REAL, dspace_id,dset_id, status)
 	CALL h5dwrite_f(dset_id, H5T_NATIVE_REAL, mlse, data_dims3, status)
 	CALL h5dclose_f(dset_id, status)	
 	CALL h5sclose_f(dspace_id, status)
 	
-	data_dims2=(/1441,721/)
+	data_dims2=(/nlon,nlat/)
 	CALL h5screate_simple_f(2, data_dims2, dspace_id, status)
 	
-	CALL h5dcreate_f(file_id, "Latitude", H5T_NATIVE_REAL, dspace_id,dset_id, status)
+	CALL h5dcreate_f(file_id, "latitude", H5T_NATIVE_REAL, dspace_id,dset_id, status)
 	CALL h5dwrite_f(dset_id, H5T_NATIVE_REAL, latitude, data_dims2, status)
 		  CALL h5screate_simple_f(arank, adims, aspace_id, status)
 		  CALL h5tcopy_f(H5T_NATIVE_CHARACTER, atype_id, status)
@@ -103,7 +108,7 @@ open(21, file="avg_month/filelist."//yyyymm//".txt")
 		  CALL h5sclose_f(aspace_id, status)
 	CALL h5dclose_f(dset_id, status)
 
-	CALL h5dcreate_f(file_id, "Longitude", H5T_NATIVE_REAL, dspace_id,dset_id, status)
+	CALL h5dcreate_f(file_id, "longitude", H5T_NATIVE_REAL, dspace_id,dset_id, status)
 	CALL h5dwrite_f(dset_id, H5T_NATIVE_REAL, longitude, data_dims2, status)
 		  CALL h5screate_simple_f(arank, adims, aspace_id, status)
 		  CALL h5tcopy_f(H5T_NATIVE_CHARACTER, atype_id, status)
