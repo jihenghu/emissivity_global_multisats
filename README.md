@@ -1,7 +1,7 @@
 # emissivity_global_multisatss
 Global clear-sky land emissivity retrieval using combined observations from GMI, FYs, Geostationary cloud
 Basic code for global emissivity retrieval, features:
-- pmw: GMI
+- pmw: FY3B
 - cloud: H-8/9, MSG-1/2/3, GOES-16
 - land only
 - clear sky
@@ -11,7 +11,7 @@ Basic code for global emissivity retrieval, features:
 - more GeoSats included;
 - essential issures mended;
 - more stable batch excuated;
-- specified for GMI instrument, final version;
+- specified forFY instrument, final version;
 
 # Requirements
 - HDF5, NETCDF
