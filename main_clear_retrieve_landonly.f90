@@ -236,8 +236,8 @@ PROGRAM main_clear_retrieve_landonly
 
   ! Get the date string from the command-line argument
   CALL GETARG(1, yyyymmdd)
-  IF (yyyymmdd<'20140407') THEN
-    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.04.07.'
+  IF (yyyymmdd<'20140101') THEN
+    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.01.01.'
     STOP
   END IF  
   
@@ -635,10 +635,10 @@ PROGRAM main_clear_retrieve_landonly
 		
 		
 !! 6.925 GHz
-		lonW=lon-0.25
-		lonE=lon+0.25
-		latN=lat+0.25
-		latS=lat-0.25
+		lonW=lon-0.125
+		lonE=lon+0.125
+		latN=lat+0.125
+		latS=lat-0.125
 		
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
@@ -683,10 +683,10 @@ PROGRAM main_clear_retrieve_landonly
 
 
 !!! 18.23.36 GHZ
-		lonW=lon-0.15
-		lonE=lon+0.15
-		latN=lat+0.15
-		latS=lat-0.15
+		lonW=lon-0.06
+		lonE=lon+0.06
+		latN=lat+0.06
+		latS=lat-0.06
 		
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
@@ -731,10 +731,10 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 
 !!! 89 GHZ
-		lonW=lon-0.08
-		lonE=lon+0.08
-		latN=lat+0.08
-		latS=lat-0.08
+		lonW=lon-0.03
+		lonE=lon+0.03
+		latN=lat+0.03
+		latS=lat-0.03
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
 		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
@@ -913,10 +913,10 @@ PROGRAM main_clear_retrieve_landonly
 
 		!!! ===============================================================================================================
 		!! 6.925 GHz ----------------------------------------------------------------------------------
-		lonW=lon-0.25
-		lonE=lon+0.25
-		latN=lat+0.25
-		latS=lat-0.25
+		lonW=lon-0.125
+		lonE=lon+0.125
+		latN=lat+0.125
+		latS=lat-0.125
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -954,10 +954,10 @@ PROGRAM main_clear_retrieve_landonly
 
 		
 		!! 18.23.36 ----------------------------------------------------------------------------------
-		lonW=lon-0.15
-		lonE=lon+0.15
-		latN=lat+0.15
-		latS=lat-0.15
+		lonW=lon-0.06
+		lonE=lon+0.06
+		latN=lat+0.06
+		latS=lat-0.06
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -993,10 +993,10 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 
 		!! 89 ----------------------------------------------------------------------------------
-		lonW=lon-0.08
-		lonE=lon+0.08
-		latN=lat+0.08
-		latS=lat-0.08
+		lonW=lon-0.03
+		lonE=lon+0.03
+		latN=lat+0.03
+		latS=lat-0.03
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
