@@ -2,9 +2,9 @@ begin
 ; file_name="Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO.20150802-S000207-E013440.txt"
 
 ; yyyymmdd=20170301
-path="/home/jihenghu/data00/data_em/GMI_EMISSIVITY/"+sprinti("%0.4i",yyyymmdd/10000)+"/"+yyyymmdd+"/"
+path="/home/jihenghu/data00/data_em/FY3B_EMISSIVITY/"+sprinti("%0.4i",yyyymmdd/10000)+"/"+yyyymmdd+"/"
 
-fillist=systemfunc("cd "+path+" ; ls Emissivity.Clear.GMI.HIMA.GOESR.MSG.*.txt")
+fillist=systemfunc("cd "+path+" ; ls Emissivity.Clear.FY3B.*.txt")
 
 nrows=0
 ncols=0
@@ -14,7 +14,7 @@ do iF=0,dimsizes(fillist)-1
     nrows=nrows+nrow
 end do 
 
-fmlse=new((/nrows,9/),float,-999.9)
+fmlse=new((/nrows,10/),float,-999.9)
 flon=new(nrows,float,-999.9)
 flat=new(nrows,float,-999.9)
 flag=new(nrows,float)
@@ -29,7 +29,7 @@ do iF=0,dimsizes(fillist)-1
     flon(irow:irow+nrow-1)=io(:,4)
     flat(irow:irow+nrow-1)=io(:,5)
     flag(irow:irow+nrow-1)=io(:,ncol-1)
-    fmlse(irow:irow+nrow-1,:)=io(:,7:7+8)  
+    fmlse(irow:irow+nrow-1,:)=io(:,7:7+9)  
 
     irow=irow+nrow
 end do   
@@ -95,17 +95,17 @@ printVarSummary(fmlse)
     res@sfXCellBounds :=edgx
     res@sfYCellBounds :=edgy
     
-    channels=(/"10V","10H","18V","18H","23V","36V","36H","89V","89H","Flag"/)
+    channels=(/"10V","10H","18V","18H","23V","23H","36V","36H","89V","Flag"/)
     plot:=new(10,graphic)
 
-    ps:=(/0,2,4,5,7/) ; Vpol
+    ps:=(/0,2,4,6,8/) ; Vpol
     do ip=0,dimsizes(ps)-1
         res@gsnLeftString="";+channels(ps(ip))
         plot(ip*2)=gsn_csm_contour_map(wks, fmlse(:,ps(ip)), res)
     end do
 
     res@cnLevels:=(/0.7,0.75,0.8,0.85,0.9,0.91,0.92,0.93,0.94,0.95,0.96,0.97,0.98,0.99/)
-    ps:=(/1,3,6,8/) ; Hpol
+    ps:=(/1,3,5,7/) ; Hpol
 
     do ip=0,dimsizes(ps)-1
         ; res@gsnLeftString="GMI Emissivity, "+channels(ps(ip))

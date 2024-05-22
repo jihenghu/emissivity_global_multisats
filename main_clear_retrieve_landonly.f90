@@ -1,3 +1,4 @@
+!! 2024.05.17 new branch fy3bcd-dev
 
 !! main_clear_retrieve_landonly.f90
 !! 2024.01.01 consider only clear sky, largely save download volumn and samples.
@@ -46,13 +47,13 @@
 !!     INCLUDE subroutines
 !! --------------------------------------------------------------------------------------------
  ! Download
- INCLUDE 'subs/sub_download_gmi_l1c.f90'
+
  INCLUDE 'subs/sub_download_ahi_l2c.f90'
  INCLUDE 'subs/sub_download_goesr_aws.f90'
  ! python 'subs/sub_download_msg_clm.py'
  ! python 'subs/sub_download_msg3_clm.py'
  ! I/O
- INCLUDE 'subs/sub_read_gmi_l1c_vars.f90'
+ INCLUDE 'subs/sub_read_fy3_mwri_vars.f90'
  INCLUDE 'subs/sub_read_land_sea_mask.f90'
  INCLUDE 'subs/sub_read_ahi_l2c_vars.f90'
  INCLUDE 'subs/sub_read_goes_l2c_vars.f90'
@@ -68,11 +69,11 @@
  INCLUDE 'subs/era5/sub_read_era5_vars.f90'
   
  ! RTTOV
- ! INCLUDE 'rttov_retrieve_gmi_emiss_landonly.f90'
+ ! INCLUDE 'rttov_retrieve_mwri_emiss_landonly.f90'
  
  ! OUTPUT
  INCLUDE 'subs/sub_write_tb_cloud_hdf5.f90'
- INCLUDE 'subs/sub_write_gmi_emiss_hdf5.f90'
+ INCLUDE 'subs/sub_write_fy3_emiss_hdf5.f90'
  INCLUDE 'subs/sub_write_profiles_hdf5.f90'
  
 !! --------------------------------------------------------------------------------------------
@@ -81,18 +82,21 @@
 PROGRAM main_clear_retrieve_landonly
   ! USE HDF5
   ! INCLUDE 'netcdf.inc'
+  use, intrinsic :: ieee_arithmetic
   Implicit none
   CHARACTER(8) :: yyyymmdd
   CHARACTER(LEN=255) :: command
-  CHARACTER(LEN=255) :: GMIL1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
+  CHARACTER(LEN=255) :: L1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
   INTEGER :: file_unit,text_unit
-!! read GMI Vars
-  INTEGER :: nscan, npixel, nchannel, GMIIO
+!! read FY3 Vars
+  INTEGER :: nscan, npixel,nchannel, FYIO
   REAL*4, DIMENSION(:,:,:), ALLOCATABLE :: TB_swath,Emissivity_swath
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: Latitude, Longitude
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: ScanTime_swath
   REAL*4, DIMENSION(:), ALLOCATABLE  :: ScanTime
-  CHARACTER(LEN=255) :: GMI_FILENAME, GOES_Sufix, GMI_Sufix
+  CHARACTER(LEN=255) :: FY3_FILENAME, GOES_Sufix, FY3_Sufix
+  CHARACTER(LEN=255) :: FY3_adscend,FY3_date,FY3_hhmm
+  CHARACTER*4 :: FYSat
 
 !! Land Sea Mask 10 km
   REAL*4, DIMENSION(3602,1800):: LSM_GRD
@@ -147,14 +151,13 @@ PROGRAM main_clear_retrieve_landonly
   INTEGER :: W,E,S,N, dum
  
 !! general
-  INTEGER:: iscan, ipixel, ichannel,ilon,ilat,ix,iy
-  REAL*4, DIMENSION(9)::  tbs
+  INTEGER:: iscan, ipixel,ilon,ilat,ix,iy
   REAL*4  :: lat, lon, stime, ls
   CHARACTER*2 :: HH, MM, MM15
   CHARACTER*3 :: DOY
   
-  INTEGER , DIMENSION(5,5):: cltype,qabit,b7,b6
-  INTEGER :: flag(5,5) ,ncloud,ncloud1, b13
+  INTEGER , DIMENSION(11,11):: cltype,qabit,b7,b6
+  INTEGER :: flag(11,11) ,ncloud,ncloud1, b13
   INTEGER :: qaflag(16)
   
   INTEGER :: STATUS
@@ -210,18 +213,19 @@ PROGRAM main_clear_retrieve_landonly
 ! ==================================================================================================
 !	 1. SET UP VARIABLES
 ! ==================================================================================================	 
+	FYSat="FY3B"
 	
 	!! Directory to save GMI_L1C HDF5 files
-	! GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
-	GMIL1C_DIR = '/nfs/nuke/jihenghu/GPM_L1C/gmi/'    
+	! L1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
+	L1C_DIR = '/data/jihenghu/data.'//FYSat//'/'    
 	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
-	ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
-	! ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
-    
+	! ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
+	ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
+
 	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data00/data_em/GMI_EMISSIVITY/'    
+    EMISS_OUTDIR = '/home/jihenghu/data00/data_em/'//FYSat//'_EMISSIVITY/'    
 	
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
@@ -236,8 +240,8 @@ PROGRAM main_clear_retrieve_landonly
 
   ! Get the date string from the command-line argument
   CALL GETARG(1, yyyymmdd)
-  IF (yyyymmdd<'20140407') THEN
-    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.04.07.'
+  IF (yyyymmdd<'20140101') THEN
+    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.01.01.'
     STOP
   END IF  
   
@@ -250,54 +254,70 @@ PROGRAM main_clear_retrieve_landonly
   CALL system("mkdir -p  "//trim(ERA5_DIR)) 
   
 ! ==================================================================================================
-! 	download GMI Files
+! 	Search FY3 Files
 ! ==================================================================================================	 
-
-  PRINT*,"Downloading GMI files of the day ......"
-  CALL download_GMI_L1C(yyyymmdd,GMIL1C_DIR)
+  
+  !! All FY3 L1C data Were downloaded prior to retrieval, thus no need to download...
+   ! PRINT*,"Downloading FY3 files of the day ......"
+   ! CALL download_GMI_L1C(yyyymmdd,L1C_DIR)
   
   ! Call the ls command to list HDF5 files in the directory
-  command ='ls '//TRIM(GMIL1C_DIR)//yyyymmdd(1:4)//"/"//yyyymmdd(5:6)//yyyymmdd(7:8)//'/*.HDF5'&
-			// '> filelists/gmi_filelist_'//yyyymmdd//'.txt' 
+  ! FY3 sample be like: FY3B_MWRIA_GBAL_L1_20140101_0000_010KM_MS.HDF
+  command ='ls '//TRIM(L1C_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd//'/*.HDF'&
+			// '> filelists/'//FYSat//'_filelist_'//yyyymmdd//'.txt' 
 
   CALL SYSTEM(command)
 
+
   ! Open a unit for reading the ls command output
-  OPEN(NEWUNIT=file_unit, FILE='filelists/gmi_filelist_'//yyyymmdd//'.txt')
+  OPEN(NEWUNIT=file_unit, FILE='filelists/'//FYSat//'_filelist_'//yyyymmdd//'.txt')
 
 !! ==================================================================================================
-!!  Loop over GMI File to retrieve
+!!  Loop over FY3 File to retrieve
 !! ==================================================================================================
 
-176	READ(file_unit,'(A)',end=886) GMI_FILENAME
+176	READ(file_unit,'(A)',end=886) FY3_FILENAME
+	! /data/jihenghu/data.fy3b/2014/20140701/FY3B_MWRIA_GBAL_L1_20140701_0026_010KM_MS.HDF
 
-   	CALL GetDesiredPiece(GMI_FILENAME, '.', 5, GMI_Sufix)
-	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."&
-				//trim(GMI_Sufix)//".HDF5"
-	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear.GMI.HIMA.GOESR.MSG."&
-				//trim(GMI_Sufix)//".txt"
+   	CALL GetDesiredPiece(FY3_FILENAME, '_', 2, FY3_adscend)
+	CALL GetDesiredPiece(FY3_FILENAME, '_', 5, FY3_date)
+	CALL GetDesiredPiece(FY3_FILENAME, '_', 6, FY3_hhmm)
+	
+	FY3_Sufix=FYSat//"."//trim(FY3_adscend)//'.'//trim(FY3_date)//'_'//trim(FY3_hhmm)
+
+
+	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear."&
+				//trim(FY3_Sufix)//".HDF5"
+	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear."&
+				//trim(FY3_Sufix)//".txt"
+					
  	!! decide to retrieve ??	
 	inquire(file=trim(EMISS_HDF5), exist=EXISTSHDF)
 	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
 	IF ((EXISTSHDF.OR.EXISTSTXT) .AND. (.NOT.REDO)) THEN
-		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(GMI_Sufix)
+		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(FY3_Sufix)
 		GOTO 176
 	END IF
 	
    !! --------------------------------------------------------------------------------------------------
-   !!		  read GMI Variables                   
+   !!		  read FY3 Variables                   
    !! --------------------------------------------------------------------------------------------------	
-    PRINT *, '├──> Read GMI file: 1C.GPM.GMI.XCAL2016-C.'//trim(GMI_Sufix)//".******.HDF5" 
+    PRINT *, '├──> Read FY3 file: '//trim(FY3_Sufix)//"_******.HDF" 
 	! get HDF5 file Dimension
-	GMIIO=0
-	CALL get_GMI_primary_dims(GMI_FILENAME,nscan,npixel,nchannel,GMIIO)
-	IF (GMIIO.NE.0) goto 176
+
+	CALL get_fy3bcd_swath_geometry(FY3_FILENAME,nscan,npixel,nchannel,FYIO)
+	IF (FYIO.NE.0) goto 176
 	
+	! print*,nscan,npixel,nchannel 
 	! Call the subroutine to read data	
 	ALLOCATE(Latitude(npixel,nscan), Longitude(npixel,nscan), LZA_swath(npixel,nscan))	
-	ALLOCATE(TB_swath(nchannel,npixel,nscan), ScanTime_swath(npixel,nscan), ScanTime(nscan))	
-	CALL read_GMI_Vars(GMI_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel,GMIIO)
-	IF (GMIIO.NE.0) goto 176
+	ALLOCATE(TB_swath(npixel,nscan,nchannel), ScanTime_swath(npixel,nscan), ScanTime(nscan))	
+	CALL read_fy3bcd_Vars(FY3_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel,FYIO)
+	
+	IF (FYIO.NE.0) then 
+		deallocate(TB_swath, Latitude, Longitude, ScanTime,LZA_swath,ScanTime_swath)
+		goto 176
+	end if
 	!! read global 0.01deg land sea mask: land 0% - 25% (strict land) - 75% (coastal) - 100% strict sea
 	!! longitude[3602] -0.05 ~ 360.05  ; latitude[1800]  -89.95 ~ 89.95
 	CALL read_land_sea_mask("subs/IMERG_land_sea_mask.nc",LSM_GRD)
@@ -311,7 +331,8 @@ PROGRAM main_clear_retrieve_landonly
 	ALLOCATE(Miss_swath(3,npixel,nscan),Clear_swath(3,npixel,nscan))
 	ALLOCATE(Sea_Frac(npixel,nscan))
 	ALLOCATE(Cloud_Flag(npixel,nscan)) 
- 
+	
+	
 	CFR_swath=0
 	Clear_swath=0
 	Sea_Frac=0
@@ -335,26 +356,32 @@ PROGRAM main_clear_retrieve_landonly
 	FLAG_H8=.FALSE. 
 	FLAG_GOES=.FALSE.  
 	FLAG_MSG=.FALSE.  
-	
+
 	!!! ----------------------------do loop -----------------------------------------------------------
 	do iscan=1,nscan
 		
 		ScanTime_swath(:,iscan)= ScanTime(iscan)
-		
+			
 	  do ipixel=1,npixel
 		lon=Longitude(ipixel,iscan)
 		lat=Latitude(ipixel,iscan)
 			
+		if (lon.le.-180.or.lon.ge.180) cycle 
+		if (lat.le.-90.or.lat.ge.90) cycle 
+		if (ieee_is_nan(lat).or.ieee_is_nan(lon))cycle
+		
 		ilon=int((lon)/0.1)+1
 		if (ilon.lt.0) ilon=ilon+3601	
 		ilat=int((lat+90)/0.1)+1
-		Sea_Frac(ipixel,iscan)=LSM_GRD(ilon,ilat)
 		
-		if(lat.ge.70 .or. lat.le. -70) cycle    !! Out of boundary
+		Sea_Frac(ipixel,iscan)=LSM_GRD(ilon,ilat)
+	
+		! if(lat.ge.70 .or. lat.le. -70) cycle    !! Out of boundary
 
 		if(Sea_Frac(ipixel,iscan).ge.25) then
 			Cloud_Flag(ipixel,iscan)=-1            !! sea/open water, will not retrieve
 			cycle !! too much water   
+
 		end if
 
 	!! ==================================================================================================
@@ -365,6 +392,7 @@ PROGRAM main_clear_retrieve_landonly
 		write(HH,'(i0.2)') int(stime)
 		write(MM,'(i0.2)')  int(int((stime-int(stime))*60)/10)*10 
 		
+		! print*,stime
 		!! ------------------------------------------------------------------------------------------------
 		!!  Distribute the sample to branch proceduces :   
 		!!  2878 :  Himawari-8 process   CLM, COT, CTH, CWP
@@ -393,7 +421,7 @@ PROGRAM main_clear_retrieve_landonly
 			HIMA='H08'
 		END IF
 		AHI_FILENAME="NC_"//HIMA//"_"//yyyymmdd//"_"//HH//MM//"_L2CLP010_FLDK.02401_02401.nc" 
-		 
+		
 		IF (trim(AHI_FILENAME) .eq. trim(error_read)) then ! file with ill
 			Cloud_Flag(ipixel,iscan)=4                  
 			goto 9642   !! OTHER GOSAT has it 
@@ -460,7 +488,7 @@ PROGRAM main_clear_retrieve_landonly
 			goto 9642  !!! go to GOES-R or MSG or END
 		end if	
  
-		cltype=ctype(ilon-2:ilon+2,ilat-2:ilat+2)       
+		cltype=ctype(ilon-5:ilon+5,ilat-5:ilat+5)       
 
 		
 		!! cltype:  0=Clear, 1=Ci, 2=Cs, 3=Deep convection, 
@@ -470,22 +498,21 @@ PROGRAM main_clear_retrieve_landonly
 		!!   !! missing rate [primitive]: num(missing)/ngrid  
 		!!-------------------------------------------------------------------------------			
 		flag=1 			
-		Miss_swath(1,ipixel,iscan)= sum(flag, mask=cltype.gt.20.or.cltype.lt.0)/25.*100   !%
-		Miss_swath(2,ipixel,iscan)= sum(flag(2:4,2:4), &
-							mask=cltype(2:4,2:4).gt.20.or.cltype(2:4,2:4).lt.0)/9.*100   !%
+		Miss_swath(1,ipixel,iscan)= sum(flag, mask=cltype.gt.20.or.cltype.lt.0)/121.*100   !%
+		Miss_swath(2,ipixel,iscan)= sum(flag(3:8,3:8), &
+							mask=cltype(3:8,3:8).gt.20.or.cltype(3:8,3:8).lt.0)/36.*100   !%
 							
-		Miss_swath(3,ipixel,iscan)= sum(flag(2:3,2:3), &
-							mask=cltype(2:3,2:3).gt.20.or.cltype(2:3,2:3).lt.0)/4.*100   !%
-		! if (cltype(3,3).gt.20 .or. cltype(3,3).lt.0) Miss_swath(3,ipixel,iscan)=100.
+		Miss_swath(3,ipixel,iscan)= sum(flag(5:6,5:6), &
+							mask=cltype(5:6,5:6).gt.20.or.cltype(5:6,5:6).lt.0)/4.*100   !%
 
 		!!-------------------------------------------------------------------------------
 		!!   cloud fraction [primitive]:   num(cloud)/ngrid , 1-cltype=0:Clear - mising
 		!!   be more strict for Clear_swath=1-cloud
 		!!-------------------------------------------------------------------------------	
 		flag=1 
-		Clear_swath(1,ipixel,iscan)= sum(flag, mask=cltype.eq.0)/25.*100   !%
-		Clear_swath(2,ipixel,iscan)= sum(flag(2:4,2:4), mask=cltype(2:4,2:4).eq.0)/9.*100   !%
-		Clear_swath(3,ipixel,iscan)= sum(flag(2:3,2:3), mask=cltype(2:3,2:3).eq.0)/4.*100   !%
+		Clear_swath(1,ipixel,iscan)= sum(flag, mask=cltype.eq.0)/121.*100   !%
+		Clear_swath(2,ipixel,iscan)= sum(flag(3:8,3:8), mask=cltype(3:8,3:8).eq.0)/36.*100   !%
+		Clear_swath(3,ipixel,iscan)= sum(flag(5:6,5:6), mask=cltype(5:6,5:6).eq.0)/4.*100   !%
 		! if (cltype(3,3).eq.0) Clear_swath(3,ipixel,iscan)= 100.
 		
 		CFR_swath(:,ipixel,iscan)=100.-Clear_swath(:,ipixel,iscan)-Miss_swath(:,ipixel,iscan)
@@ -791,7 +818,7 @@ PROGRAM main_clear_retrieve_landonly
 ! MSG   WE have only one variable to deal with, ie., CLM		
 8847    CONTINUE 	
 
-				
+		
 		IF(.NOT.(lon.gt.-67.5 .and. lon .lt. 113) ) GOTO 8404  !! out of MSG domain
 		IF(yyyymmdd<'20140101') THEN
 			Cloud_Flag(ipixel,iscan)=0
@@ -891,7 +918,7 @@ PROGRAM main_clear_retrieve_landonly
 
 			WHERE(CLM_MSG>3.OR.CLM_MSG<0) CLM_MSG=3			
 		END IF
-
+	
 
 		!! now that we have the cloud mask,NEW OR OLD, we need to locate the sample to its disk.
 		! https://www.cgms-info.org/wp-content/uploads/2021/10/cgms-lrit-hrit-global-specification-(v2-8-of-30-oct-2013).pdf
@@ -945,7 +972,8 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 1.OR. CLM_MSG(W,N) .EQ. 0)  Clear_swath(:,ipixel,iscan)=100.						   
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(:,ipixel,iscan)=100.	
 					
-			FLAG_MSG=.TRUE. 
+			FLAG_MSG=.True. 
+			! print*,FLAG_MSG
 			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
@@ -985,7 +1013,8 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 1.OR. CLM_MSG(W,N) .EQ. 0)  Clear_swath(2:3,ipixel,iscan)=100.						   
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(2:3,ipixel,iscan)=100.	
 					
-			FLAG_MSG=.TRUE. 
+			FLAG_MSG=.True. 
+			! print*,FLAG_MSG
 			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
@@ -1024,7 +1053,8 @@ PROGRAM main_clear_retrieve_landonly
 			IF(CLM_MSG(W,N) .EQ. 1.OR. CLM_MSG(W,N) .EQ. 0)  Clear_swath(3,ipixel,iscan)=100.						   
 			IF(CLM_MSG(W,N) .EQ. 2)  CFR_swath(3,ipixel,iscan)=100.	
 					
-			FLAG_MSG=.TRUE. 
+			FLAG_MSG=.True. 
+			! print*,FLAG_MSG
 			Cloud_Flag(ipixel,iscan)= cldflgmsg
 			CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 			LZA_swath(ipixel, iscan) = 	angle	
@@ -1033,9 +1063,13 @@ PROGRAM main_clear_retrieve_landonly
 
 		!!! Marked as Went Through a MSG collocation
 		FLAG_MSG=.TRUE.
+		! print*,FLAG_MSG
 		Cloud_Flag(ipixel,iscan)= cldflgmsg		
 		CALL calc_LZA(lon,lat,Lambda0,0.,angle)	
 		LZA_swath(ipixel, iscan) = 	angle	
+		
+
+		
 		!!----------------------------------------------------------------------------------------------
 		!!    END 
 		!!----------------------------------------------------------------------------------------------	 		
@@ -1044,7 +1078,9 @@ PROGRAM main_clear_retrieve_landonly
 	  end do
 	end do
 	
+	! print*,FLAG_MSG
 	IF( .NOT. ((FLAG_H8.OR.FLAG_GOES.OR.FLAG_MSG).AND.(maxval(CFR_swath)+maxval(Clear_swath)>0)) ) THEN
+		print*,"├──>> No valid sample,  goto 2333"
 		GOTO 2333
 	END IF
 	
@@ -1052,16 +1088,16 @@ PROGRAM main_clear_retrieve_landonly
 	!!===========================================================================================================
 	!!                     3. ERA5 procedure
 	!!===========================================================================================================
-	print*, "├────ERA5 procedure beginning ........."	 
+
 	
 	where(CFR_swath>10.) Miss_swath=100  !!  cloudy
 	
 	num_land=COUNT(Miss_swath(1,:,:).lt.100)
 
 	print*,nscan*npixel,COUNT(Sea_Frac.lt.50),num_land
-	
+	IF (num_land.lt.10) goto 2333
 	!! operate in 1D londonly pixel
-	
+	print*, "├────ERA5 procedure beginning ........."	 	
 	ALLOCATE(pixelid(num_land),scanid(num_land) )		
 	ALLOCATE(LST_land(num_land), Psrf_land(num_land), T2m_land(num_land), SnowC_land(num_land), SMC_land(num_land))	
 
@@ -1097,7 +1133,7 @@ PROGRAM main_clear_retrieve_landonly
 			pixelid(iland)=ipixel
 			scanid(iland) =iscan
 			
-			TB_land(:,iland)=TB_swath(:,ipixel,iscan)
+			TB_land(:,iland)=TB_swath(ipixel,iscan,:)
 			Longitude_land(iland)=Longitude(ipixel,iscan)
 			Latitude_land(iland) =Latitude(ipixel,iscan)
 			ScanTime_land(iland)=ScanTime(iscan)
@@ -1189,7 +1225,7 @@ PROGRAM main_clear_retrieve_landonly
 							
 				call read_ERA5_profiles(trim(req_era5_hr2),elon,elat,qw2,ta2,profIO)
 				call read_ERA5_landvars(trim(req_land_hr2),lst2,psrf2,t2m2,snowc1,smc2,landIO)
-				
+
 				IF (.NOT.(profIO.and.landIO)) goto 1505
 				
 				where(qw2.eq.0) qw2=1E-9	
@@ -1232,27 +1268,27 @@ PROGRAM main_clear_retrieve_landonly
 	! channel 10.65 
 	print*, "├──── Start RTTOV retrieve Channel 1-2 ......."
 
-	call rttov_retrieve_gmi_emiss_clearsky(imonth,nlevel,num_land,2,52.8,(/1,2/),&
+	call rttov_retrieve_mwri_emiss_clearsky(imonth,nlevel,num_land,2,53.1,(/1,2/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
 			Vapor_land,AirTemp_land,&
 			LST_land,Psrf_land,T2m_land,SnowC_land,&
-			SMC_land,TB_land(1:2,:),Emissivity_land(1:2,:)) 
+			SMC_land,TB_land(1:2,:),Emissivity_land(1:2,:), FYSat) 
 
 	! channel 18,18,23,36,36
-	print*, "├──── Start RTTOV retrieve Channel 3-7 ......."
-	call rttov_retrieve_gmi_emiss_clearsky(imonth,nlevel,num_land,5,52.8,(/3,4,5,6,7/),&
+	print*, "├──── Start RTTOV retrieve Channel 3-8 ......."
+	call rttov_retrieve_mwri_emiss_clearsky(imonth,nlevel,num_land,6,53.1,(/3,4,5,6,7,8/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
 			Vapor_land,AirTemp_land,&
 			LST_land,Psrf_land,T2m_land,SnowC_land,&
-			SMC_land,TB_land(3:7,:),Emissivity_land(3:7,:)) 
+			SMC_land,TB_land(3:8,:),Emissivity_land(3:8,:), FYSat) 
 
 	! channel 89
-	print*, "├──── Start RTTOV retrieve Channel 8-9 ......."
-	call rttov_retrieve_gmi_emiss_clearsky(imonth,nlevel,num_land,2,52.8,(/8,9/),&
+	print*, "├──── Start RTTOV retrieve Channel 9-10 ......."
+	call rttov_retrieve_mwri_emiss_clearsky(imonth,nlevel,num_land,2,53.1,(/9,10/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
 			Vapor_land,AirTemp_land,&
 			LST_land,Psrf_land,T2m_land,SnowC_land,&
-			SMC_land,TB_land(8:9,:),Emissivity_land(8:9,:)) 
+			SMC_land,TB_land(9:10,:),Emissivity_land(9:10,:), FYSat) 
 
 	!! post-process
 	WHERE(Latitude_land.le.minval(elat).or.Latitude_land.ge.maxval(elat))
@@ -1265,6 +1301,7 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(7,:)=-999.9
 		Emissivity_land(8,:)=-999.9
 		Emissivity_land(9,:)=-999.9
+		Emissivity_land(10,:)=-999.9
 	ENDWHERE
 		
 	WHERE(LST_land.le.10 .or. LZA_land.lt.0)
@@ -1277,6 +1314,7 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(7,:)=-999.9
 		Emissivity_land(8,:)=-999.9
 		Emissivity_land(9,:)=-999.9
+		Emissivity_land(10,:)=-999.9
 		LST_land=-999.9
 	ENDWHERE
 
@@ -1316,11 +1354,12 @@ PROGRAM main_clear_retrieve_landonly
 			Emissivity_swath(5,:,:)=-999.9
 			Emissivity_swath(6,:,:)=-999.9
 			Emissivity_swath(7,:,:)=-999.9
+			Emissivity_swath(8,:,:)=-999.9
 		ENDWHERE
 		
 		WHERE(Miss_swath(3,:,:).ge.99)
-			Emissivity_swath(8,:,:)=-999.9
 			Emissivity_swath(9,:,:)=-999.9
+			Emissivity_swath(10,:,:)=-999.9
 		ENDWHERE
 	END IF	
   ! --------------------------------------------------------------------------
@@ -1339,10 +1378,11 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(5,:)=-999.9
 		Emissivity_land(6,:)=-999.9
 		Emissivity_land(7,:)=-999.9
+		Emissivity_land(8,:)=-999.9
 	ENDWHERE
 	
 	WHERE(Miss_land(3,:).ge.99)
-		Emissivity_land(8,:)=-999.9
+		Emissivity_land(10,:)=-999.9
 		Emissivity_land(9,:)=-999.9
 	ENDWHERE
 	
@@ -1360,7 +1400,7 @@ PROGRAM main_clear_retrieve_landonly
 	
 	END DO	
 	PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_TEXT))
-505 format(4I6, 3f10.4, 18f10.4, 5f10.4, 10f10.4, I6)
+505 format(4I6, 3f10.4, 20f10.4, 5f10.4, 10f10.4, I6)
 	
 	close(text_unit)
 	
@@ -1398,10 +1438,10 @@ PROGRAM main_clear_retrieve_landonly
 
 	DEALLOCATE(ScanTime_land,LZA_land,Sea_land,Cloudflg_land)
 	DEALLOCATE(CFR_land,Clear_land,Miss_land)
-	
+
 2333 Continue
-		
-	!! Deallocate( GMI)
+		! print*,"pass 2333"	
+	!! Deallocate( FY3)
 	DEALLOCATE(TB_swath, Latitude, Longitude, ScanTime_swath, ScanTime, LZA_swath)	
 	DEALLOCATE(CFR_swath,Clear_swath,Sea_Frac,Cloud_Flag,Miss_swath)
 
@@ -1411,7 +1451,7 @@ PROGRAM main_clear_retrieve_landonly
 	
 886 continue
 
-	PRINT*, "|| GMI_L1C process done - "//yyyymmdd	
+	PRINT*, "|| "//FYSat//"_L1C process done - "//yyyymmdd	
 	! Close the filelist
 	CLOSE(file_unit)
 	

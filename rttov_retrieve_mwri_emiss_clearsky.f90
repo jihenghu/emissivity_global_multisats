@@ -7,7 +7,7 @@
 !!
 !!   The subroutine returns the retrieved emissivity  
 
-subroutine rttov_retrieve_gmi_emiss_clearsky( &
+subroutine rttov_retrieve_mwri_emiss_clearsky( &
 		imonth,nlevel,nland,nchannel,incident, &
 		channels,& 					!! [nchannel] channel list
 		longitude,latitude,&        !!  Geolications
@@ -20,8 +20,9 @@ subroutine rttov_retrieve_gmi_emiss_clearsky( &
 		snowc,&						!!  snow cover [0~1]
 		smc,&						!!  soil top layer moisture in m3/m3
 		TBin,&					!!  GMI top of atmos. brigtness temperature in K
-		emiss_ret)  				!!  to retrieve emissivities
-
+		emiss_ret,& 				!!  to retrieve emissivities
+		sats) 
+		
   ! rttov_const contains useful RTTOV constants
   USE rttov_const, ONLY :     &
          errorstatus_success, &
@@ -97,6 +98,7 @@ subroutine rttov_retrieve_gmi_emiss_clearsky( &
 
 !! ===========================================================================
   INTEGER ,intent(in) 	:: nland,nchannel,nlevel
+  character*4 ,intent(in) 	:: sats
   INTEGER 	:: iland
   REAL 	,intent(in)								:: incident
   INTEGER, dimension(nchannel) ,intent(in) 		:: channels
@@ -134,7 +136,7 @@ subroutine rttov_retrieve_gmi_emiss_clearsky( &
 
   INTEGER(KIND=jpim) :: atlas_type
   INTEGER(KIND=jpim) :: alloc_status
-  CHARACTER(LEN=22)  :: NameOfRoutine = 'rttov_retrieve_gmi_emiss'
+  CHARACTER(LEN=22)  :: NameOfRoutine = 'rttov_retrieve_mwri_emiss'
 
   ! variables for input
   !====================
@@ -179,11 +181,13 @@ subroutine rttov_retrieve_gmi_emiss_clearsky( &
   !=====================================================
   !========== Interactive inputs == start ==============
 
-  hydrotable_filename='/home/jihenghu/rttov13/rtcoef_rttov13/hydrotable/hydrotable_gpm_gmi.dat'
-  coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_gpm_1_gmi.dat'
+  hydrotable_filename='/home/jihenghu/rttov13/rtcoef_rttov13/hydrotable/hydrotable_fy3_mwri.dat'
   
-
-  
+  if (sats=='FY3B') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_2_mwri.dat'
+  if (sats=='FY3C') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_3_mwri.dat'
+  if (sats=='FY3D') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_4_mwri.dat'
+  if (sats=='FY3G') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_4_mwri.dat'
+    
   nprof=nland
   nlevels=nlevel
   nchannels=nchannel
@@ -568,4 +572,4 @@ subroutine rttov_retrieve_gmi_emiss_clearsky( &
   Deallocate(obs_tb)
   Deallocate(land_emis)
 
-end subroutine rttov_retrieve_gmi_emiss_clearsky
+end subroutine rttov_retrieve_mwri_emiss_clearsky
