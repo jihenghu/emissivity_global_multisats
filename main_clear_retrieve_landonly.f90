@@ -215,17 +215,16 @@ PROGRAM main_clear_retrieve_landonly
 ! ==================================================================================================	 
 	FYSat="FY3B"
 	
-	!! Directory to save GMI_L1C HDF5 files
-	! L1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
-	L1C_DIR = '/data/jihenghu/data.'//FYSat//'/'    
-	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
-	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
-	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
+	!! Directory to save GMI_L1C HDF5 files 
+	L1C_DIR = '/home/jihenghu/fy03/FY3B/ascend/'    
+	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
+	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
+	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
 	! ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
-	ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
+	ERA5_DIR = '/home/jihenghu/data00/ERA5/'
 
 	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data00/data_em/'//FYSat//'_EMISSIVITY/'    
+    EMISS_OUTDIR = '/home/jihenghu/data05/'//FYSat//'_EMISSIVITY/'    
 	
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
