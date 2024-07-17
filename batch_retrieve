@@ -4,7 +4,7 @@ second=$2
 while [ "$first" -le "$second" ]
 do
     echo + [thread-main] $first  start ++++++++++++++++++++++++++++++++++
-    ./main_gmi_em.exe $first	
+    ./main_mwri_em.exe $first	
     echo + [thread-main] $first finished
     let first=`date -d "-1 days ago ${first}" +%Y%m%d`
 done

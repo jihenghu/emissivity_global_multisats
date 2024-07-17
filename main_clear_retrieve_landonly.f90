@@ -209,7 +209,8 @@ PROGRAM main_clear_retrieve_landonly
 
   Integer :: num_land,iland
   
-  logical :: REDO, HDF5
+  logical :: REDO, HDF5,useERA5,ERA5land_Batchdownload
+
 ! ==================================================================================================
 !	 1. SET UP VARIABLES
 ! ==================================================================================================	 
@@ -229,6 +230,8 @@ PROGRAM main_clear_retrieve_landonly
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
+	useERA5=.False. ! True : use exist, dont download 
+	ERA5land_Batchdownload=.True. !! directly download ERA5-land for 24 hours, and split
 ! ==================================================================================================
 
   ! Check if a command-line argument is provided
@@ -298,6 +301,10 @@ PROGRAM main_clear_retrieve_landonly
 		GOTO 176
 	END IF
 	
+	IF (ERA5land_Batchdownload) THEN
+	 call system("python3 subs/era5/download_era5_lands_batch.py "//yyyymmdd//" "//trim(ERA5_DIR)) 
+	END IF
+
    !! --------------------------------------------------------------------------------------------------
    !!		  read FY3 Variables                   
    !! --------------------------------------------------------------------------------------------------	
@@ -1170,7 +1177,8 @@ PROGRAM main_clear_retrieve_landonly
 					
 				inquire(file=trim(adjustl(req_era5_hr1)), exist=alive1)
 				inquire(file=trim(adjustl(req_land_hr1)), exist=alive2)
-
+				
+				IF (((.not.alive1).or.(.not.alive2)).and. useERA5) goto 1505
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
@@ -1206,6 +1214,8 @@ PROGRAM main_clear_retrieve_landonly
 					
 				inquire(file=trim(adjustl(req_era5_hr2)), exist=alive1)
 				inquire(file=trim(adjustl(req_land_hr2)), exist=alive2)
+
+				IF (((.not.alive1).or.(.not.alive2)).and. useERA5) goto 1505
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
