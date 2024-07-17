@@ -231,7 +231,7 @@ PROGRAM main_clear_retrieve_landonly
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 	useERA5=.False. ! True : use exist, dont download 
-	ERA5land_Batchdownload=.True. !! directly download ERA5-land for 24 hours, and split
+	ERA5land_Batchdownload=.False. !! directly download ERA5-land for 24 hours, and split
 ! ==================================================================================================
 
   ! Check if a command-line argument is provided
