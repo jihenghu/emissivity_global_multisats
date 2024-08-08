@@ -212,27 +212,13 @@ PROGRAM main_clear_retrieve_landonly
   logical :: REDO, HDF5,useERA5,ERA5land_Batchdownload
 
 ! ==================================================================================================
-!	 1. SET UP VARIABLES
-! ==================================================================================================	 
-	FYSat="FY3B"
-	
-	!! Directory to save GMI_L1C HDF5 files 
-	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/ascend/'    
-	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
-	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
-	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
-
-	! ERA5_DIR = '/home/jihenghu/data00/ERA5/'
-	ERA5_DIR = '/home/jihenghu/data04/ERA5/'
-
-	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data05/'//FYSat//'_EMISSIVITY/'    
 	
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 	useERA5=.True. ! True : use exist, dont download 
 	ERA5land_Batchdownload=.False. !! directly download ERA5-land for 24 hours, and split
+
 ! ==================================================================================================
 
   ! Check if a command-line argument is provided
@@ -248,14 +234,44 @@ PROGRAM main_clear_retrieve_landonly
     STOP
   END IF  
   
+! ==================================================================================================
+!	 1. SET UP VARIABLES
+! ==================================================================================================	 
+	FYSat="FY3D"
+	
+	!! Directory to save GMI_L1C HDF5 files 
+	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/ascend/'    
+	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
+	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
+	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
+	
+	!! OUTPUTs 
+    EMISS_OUTDIR = '/home/jihenghu/data05/'//FYSat//'_EMISSIVITY/'    
+
+	ERA5_DIR = '/home/jihenghu/data00/ERA5/'
+
+  ! IF (yyyymmdd(1:4)<'2019') ERA5_DIR = '/home/jihenghu/data00/ERA5/'
+  IF (yyyymmdd(1:4)>'2018') THEN
+	IF (yyyymmdd(5:8)<'0701') ERA5_DIR = '/home/jihenghu/data04/ERA5/'
+	IF (yyyymmdd(5:8)>'0631') THEN
+		ERA5_DIR = '/data/jihenghu/tmp_data/ERA5/'
+		HIMA_DIR = '/data/jihenghu/tmp_data/AHI_L2/'    
+		GEOS_DIR = '/data/jihenghu/tmp_data/GOESR_CLM/'  
+		MSG_DIR	 = '/data/jihenghu/tmp_data/MSG_CLM/'
+	END IF
+  END IF
+  
+    
+  
+  ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
+  CALL system("mkdir -p  "//trim(ERA5_DIR)) 
+  
   CALL system("mkdir  filelists")  
   CALL system("mkdir  logs") 
   
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR))  
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd)
-  ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
-  CALL system("mkdir -p  "//trim(ERA5_DIR)) 
-  
+   
 ! ==================================================================================================
 ! 	Search FY3 Files
 ! ==================================================================================================	 
