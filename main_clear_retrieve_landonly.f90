@@ -217,13 +217,13 @@ PROGRAM main_clear_retrieve_landonly
 	FYSat="FY3C"
 	
 	!! Directory to save GMI_L1C HDF5 files 
-	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/descend/'    
+	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/ascend/'    
 	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
 
-	ERA5_DIR = '/home/jihenghu/data00/ERA5/'
-	! ERA5_DIR = '/home/jihenghu/data04/ERA5/'
+	! ERA5_DIR = '/home/jihenghu/data00/ERA5/'
+	ERA5_DIR = '/home/jihenghu/data04/ERA5/'
 
 	!! OUTPUTs 
     EMISS_OUTDIR = '/home/jihenghu/data05/'//FYSat//'_EMISSIVITY/'    
@@ -231,7 +231,7 @@ PROGRAM main_clear_retrieve_landonly
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
-	useERA5=.False. ! True : use exist, dont download 
+	useERA5=.True. ! True : use exist, dont download 
 	ERA5land_Batchdownload=.False. !! directly download ERA5-land for 24 hours, and split
 ! ==================================================================================================
 
