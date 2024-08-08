@@ -1,7 +1,7 @@
 # emissivity_global_multisatss
 Global clear-sky land emissivity retrieval using combined observations from GMI, FYs, Geostationary cloud
 Basic code for global emissivity retrieval, features:
-- pmw: FY3B
+- pmw: FY3D
 - cloud: H-8/9, MSG-1/2/3, GOES-16
 - land only
 - clear sky
