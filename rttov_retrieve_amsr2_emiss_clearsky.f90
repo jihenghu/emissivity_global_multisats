@@ -181,7 +181,7 @@ subroutine rttov_retrieve_amsr_emiss_clearsky( &
   !=====================================================
   !========== Interactive inputs == start ==============
 
-  hydrotable_filename='/home/jihenghu/rttov13/rtcoef_rttov13/hydrotable/hydrotable_fy3_mwri.dat'
+  hydrotable_filename='/home/jihenghu/rttov13/rtcoef_rttov13/hydrotable/hydrotable_gcom-w_amsr2.dat'
   
   coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_gcom-w_1_amsr2.dat'
 
