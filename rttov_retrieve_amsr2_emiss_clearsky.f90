@@ -7,7 +7,7 @@
 !!
 !!   The subroutine returns the retrieved emissivity  
 
-subroutine rttov_retrieve_mwri_emiss_clearsky( &
+subroutine rttov_retrieve_amsr_emiss_clearsky( &
 		imonth,nlevel,nland,nchannel,incident, &
 		channels,& 					!! [nchannel] channel list
 		longitude,latitude,&        !!  Geolications
@@ -98,7 +98,7 @@ subroutine rttov_retrieve_mwri_emiss_clearsky( &
 
 !! ===========================================================================
   INTEGER ,intent(in) 	:: nland,nchannel,nlevel
-  character*4 ,intent(in) 	:: sats
+  character*5 ,intent(in) 	:: sats
   INTEGER 	:: iland
   REAL 	,intent(in)								:: incident
   INTEGER, dimension(nchannel) ,intent(in) 		:: channels
@@ -136,7 +136,7 @@ subroutine rttov_retrieve_mwri_emiss_clearsky( &
 
   INTEGER(KIND=jpim) :: atlas_type
   INTEGER(KIND=jpim) :: alloc_status
-  CHARACTER(LEN=22)  :: NameOfRoutine = 'rttov_retrieve_mwri_emiss'
+  CHARACTER(LEN=22)  :: NameOfRoutine = 'rttov_retrieve_amsr_emiss'
 
   ! variables for input
   !====================
@@ -183,11 +183,8 @@ subroutine rttov_retrieve_mwri_emiss_clearsky( &
 
   hydrotable_filename='/home/jihenghu/rttov13/rtcoef_rttov13/hydrotable/hydrotable_fy3_mwri.dat'
   
-  if (sats=='FY3B') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_2_mwri.dat'
-  if (sats=='FY3C') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_3_mwri.dat'
-  if (sats=='FY3D') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_4_mwri.dat'
-  if (sats=='FY3G') coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_fy3_4_mwri.dat'
-    
+  coef_filename='/home/jihenghu/rttov13/rtcoef_rttov13/rttov13pred54L/rtcoef_gcom-w_1_amsr2.dat'
+
   nprof=nland
   nlevels=nlevel
   nchannels=nchannel
@@ -572,4 +569,4 @@ subroutine rttov_retrieve_mwri_emiss_clearsky( &
   Deallocate(obs_tb)
   Deallocate(land_emis)
 
-end subroutine rttov_retrieve_mwri_emiss_clearsky
+end subroutine rttov_retrieve_amsr_emiss_clearsky

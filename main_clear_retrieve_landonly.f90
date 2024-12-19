@@ -1,4 +1,4 @@
-!! 2024.05.17 new branch fy3bcd-dev
+!! 2024.05.17 new branch AMSR2-dev
 
 !! main_clear_retrieve_landonly.f90
 !! 2024.01.01 consider only clear sky, largely save download volumn and samples.
@@ -10,7 +10,7 @@
 !! for the purpose of less time consuming, saving at least 2/3 time foreach
 
 !! =============================================================================================
-!!  main_retrieve_gmi_emissivity_allsky.f90
+!!  main_retrieve_amsr2_emissivity_allsky.f90
 !!  Main program to retrieve land surface emissivity using GMI_Cloud_collocations：
 !!	
 !!  TOC:
@@ -35,7 +35,7 @@
 !!---------------------------------------------------------------------------------------------
 !! 							DATA AVAILABLE RANGE 
 !!---------------------------------------------------------------------------------------------
-!! GMI L1C :  2014.03.04 - present, every orbits
+!! AMSR2 L1C :  2014.01.01 - present, every orbits
 !! H-8/9 AHI L2CLP : 2015.07.04 - present, every 10-min  
 !! GOES-R ABI L2 Cloud : AWS (2019.339-present, 10-min)  CLASS/NCEI(2017.06.08-present) “hard”
 !! MSG1/2 indian sea : 2017.2.1 - present  ONLY Cloud Mask , 15-min 
@@ -50,14 +50,17 @@
 
  INCLUDE 'subs/sub_download_ahi_l2c.f90'
  INCLUDE 'subs/sub_download_goesr_aws.f90'
+ INCLUDE 'subs/sub_download_amsr2_l1c.f90'
  ! python 'subs/sub_download_msg_clm.py'
  ! python 'subs/sub_download_msg3_clm.py'
+ 
  ! I/O
- INCLUDE 'subs/sub_read_fy3_mwri_vars.f90'
+ INCLUDE 'subs/sub_read_amsr2_l1c_vars.f90'
  INCLUDE 'subs/sub_read_land_sea_mask.f90'
  INCLUDE 'subs/sub_read_ahi_l2c_vars.f90'
  INCLUDE 'subs/sub_read_goes_l2c_vars.f90'
  INCLUDE 'subs/sub_read_msg_iodc_clm.f90'
+ 
 
  ! Tools
  INCLUDE 'subs/sub_tools.f90'
@@ -88,16 +91,20 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER(LEN=255) :: command
   CHARACTER(LEN=255) :: L1C_DIR,HIMA_DIR,GEOS_DIR,MSG_DIR
   INTEGER :: file_unit,text_unit
+  
 !! read FY3 Vars
   INTEGER :: nscan, npixel,nchannel, FYIO
-  REAL*4, DIMENSION(:,:,:), ALLOCATABLE :: TB_swath,Emissivity_swath
+  REAL*4, DIMENSION(:,:,:), ALLOCATABLE :: TB_swath,Emissivity_swath,TBs
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: Latitude, Longitude
   REAL*4, DIMENSION(:,:), ALLOCATABLE  :: ScanTime_swath
   REAL*4, DIMENSION(:), ALLOCATABLE  :: ScanTime
-  CHARACTER(LEN=255) :: FY3_FILENAME, GOES_Sufix, FY3_Sufix
-  CHARACTER(LEN=255) :: FY3_adscend,FY3_date,FY3_hhmm
-  CHARACTER*4 :: FYSat
-
+  CHARACTER(LEN=255) :: TB_FILENAME, GOES_Sufix, amsr_prefix
+  CHARACTER(LEN=255) :: obs_time,orbitnu
+  CHARACTER*5 :: SENSOR
+  CHARACTER*2 :: Freq_GRP
+  CHARACTER*2 :: Freq_GRPS(4)
+  integer :: ig,iff
+  
 !! Land Sea Mask 10 km
   REAL*4, DIMENSION(3602,1800):: LSM_GRD
 
@@ -156,8 +163,8 @@ PROGRAM main_clear_retrieve_landonly
   CHARACTER*2 :: HH, MM, MM15
   CHARACTER*3 :: DOY
   
-  INTEGER , DIMENSION(11,11):: cltype,qabit,b7,b6
-  INTEGER :: flag(11,11) ,ncloud,ncloud1, b13
+  INTEGER , DIMENSION(7,7):: cltype,qabit,b7,b6
+  INTEGER :: flag(7,7) ,ncloud,ncloud1, b13
   INTEGER :: qaflag(16)
   
   INTEGER :: STATUS
@@ -214,19 +221,19 @@ PROGRAM main_clear_retrieve_landonly
 ! ==================================================================================================
 !	 1. SET UP VARIABLES
 ! ==================================================================================================	 
-	FYSat="FY3B"
+	SENSOR="AMSR2"
 	
 	!! Directory to save GMI_L1C HDF5 files 
-	L1C_DIR = '/home/jihenghu/fy03/FY3B/descend/'    
+	L1C_DIR = '/nfs/nuke/jihenghu/GPM_L1C/amsr2/'    
 	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
 
 	! ERA5_DIR = '/home/jihenghu/data00/ERA5/'
-	ERA5_DIR = '/home/jihenghu/data04/ERA5/'
+	! ERA5_DIR = '/home/jihenghu/data04/ERA5/'
 
 	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data05/'//FYSat//'_EMISSIVITY/'    
+    EMISS_OUTDIR = '/home/jihenghu/data05/'//SENSOR//'_EMISSIVITY/'    
 	
 	REDO=.False.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
@@ -253,78 +260,99 @@ PROGRAM main_clear_retrieve_landonly
   
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR))  
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd)
+  
+  IF (yyyymmdd>'20181231')  ERA5_DIR="/home/jihenghu/data05/ERA5_2019_2023/"
+  IF (yyyymmdd<'20181232')  ERA5_DIR="/home/jihenghu/data04/ERA5/"
+    
   ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
-  CALL system("mkdir -p  "//trim(ERA5_DIR)) 
+  ! CALL system("mkdir -p  "//trim(ERA5_DIR)) 
+
+  
+  
   
 ! ==================================================================================================
 ! 	Search FY3 Files
 ! ==================================================================================================	 
   
   !! All FY3 L1C data Were downloaded prior to retrieval, thus no need to download...
-   ! PRINT*,"Downloading FY3 files of the day ......"
+   ! PRINT*,"Downloading GPM L1C files of the day ......"
    ! CALL download_GMI_L1C(yyyymmdd,L1C_DIR)
-  
+   ! CALL download_AMSR2_L1C(yyyymmdd,L1C_DIR)
+
   ! Call the ls command to list HDF5 files in the directory
   ! FY3 sample be like: FY3B_MWRIA_GBAL_L1_20140101_0000_010KM_MS.HDF
-  command ='ls '//TRIM(L1C_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd//'/*.HDF'&
-			// '> filelists/'//FYSat//'_filelist_'//yyyymmdd//'.txt' 
+  command ='ls '//TRIM(L1C_DIR)//"/"//yyyymmdd(1:4)//"/"//yyyymmdd(5:8)//'/*.HDF5'&
+			// '> filelists/'//SENSOR//'_filelist_'//yyyymmdd//'.txt' 
 
   CALL SYSTEM(command)
 
 
   ! Open a unit for reading the ls command output
-  OPEN(NEWUNIT=file_unit, FILE='filelists/'//FYSat//'_filelist_'//yyyymmdd//'.txt')
+  OPEN(NEWUNIT=file_unit, FILE='filelists/'//SENSOR//'_filelist_'//yyyymmdd//'.txt')
 
 !! ==================================================================================================
 !!  Loop over FY3 File to retrieve
 !! ==================================================================================================
 
-176	READ(file_unit,'(A)',end=886) FY3_FILENAME
-	! /data/jihenghu/data.fy3b/2014/20140701/FY3B_MWRIA_GBAL_L1_20140701_0026_010KM_MS.HDF
-
-   	CALL GetDesiredPiece(FY3_FILENAME, '_', 2, FY3_adscend)
-	CALL GetDesiredPiece(FY3_FILENAME, '_', 5, FY3_date)
-	CALL GetDesiredPiece(FY3_FILENAME, '_', 6, FY3_hhmm)
+176	READ(file_unit,'(A)',end=886) TB_FILENAME
+	! /nfs/nuke/jihenghu/GPM_L1C/amsr2//2014/0101/1C.GCOMW1.AMSR2.XCAL2016-V.20140101-S004048-E021940.008643.V07A.HDF5
 	
-	FY3_Sufix=FYSat//"."//trim(FY3_adscend)//'.'//trim(FY3_date)//'_'//trim(FY3_hhmm)
-
+	CALL GetDesiredPiece(TB_FILENAME, '.', 5, obs_time)
+	CALL GetDesiredPiece(TB_FILENAME, '.', 6, orbitnu)
+	
+	amsr_prefix=SENSOR//'.'//trim(obs_time)//'_'//trim(orbitnu)
 
 	EMISS_HDF5=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear."&
-				//trim(FY3_Sufix)//".HDF5"
+				//trim(amsr_prefix)//".HDF5"
 	EMISS_TEXT=trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd//"/Emissivity.Clear."&
-				//trim(FY3_Sufix)//".txt"
-					
+				//trim(amsr_prefix)//".txt"
+	
+	
  	!! decide to retrieve ??	
 	inquire(file=trim(EMISS_HDF5), exist=EXISTSHDF)
 	inquire(file=trim(EMISS_TEXT), exist=EXISTSTXT)
 	IF ((EXISTSHDF.OR.EXISTSTXT) .AND. (.NOT.REDO)) THEN
-		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(FY3_Sufix)
+		PRINT*,"├──> Old Retrieval found, skip this orbit: "//trim(amsr_prefix)
 		GOTO 176
 	END IF
 	
+	!! we use the old version cdsapi h5 netcdf format, no more download needed
 	IF (ERA5land_Batchdownload) THEN
-	 call system("python3 subs/era5/download_era5_lands_batch.py "//yyyymmdd//" "//trim(ERA5_DIR)) 
+		call system("python3 subs/era5/download_era5_lands_batch.py "//yyyymmdd//" "//trim(ERA5_DIR)) 
 	END IF
 
    !! --------------------------------------------------------------------------------------------------
-   !!		  read FY3 Variables                   
+   !!		  read AMSR Variables                   
    !! --------------------------------------------------------------------------------------------------	
-    PRINT *, '├──> Read FY3 file: '//trim(FY3_Sufix)//"_******.HDF" 
+    PRINT *, '├──> Read AMSR2 file: '//trim(amsr_prefix)//"_******.HDF" 
+	
 	! get HDF5 file Dimension
-
-	CALL get_fy3bcd_swath_geometry(FY3_FILENAME,nscan,npixel,nchannel,FYIO)
+	! S1-S5: 10, 18, 23, 36, 89
+	
+	Freq_GRP="S1"
+	call get_AMSR2_primary_dims(TB_FILENAME,Freq_GRP,nscan,npixel,nchannel,FYIO)
 	IF (FYIO.NE.0) goto 176
-	
-	! print*,nscan,npixel,nchannel 
-	! Call the subroutine to read data	
+	PRINT*, nscan,npixel,nchannel
+
 	ALLOCATE(Latitude(npixel,nscan), Longitude(npixel,nscan), LZA_swath(npixel,nscan))	
-	ALLOCATE(TB_swath(npixel,nscan,nchannel), ScanTime_swath(npixel,nscan), ScanTime(nscan))	
-	CALL read_fy3bcd_Vars(FY3_FILENAME, TB_swath, Latitude, Longitude, ScanTime, nscan, npixel, nchannel,FYIO)
+	ALLOCATE(TB_swath(npixel,nscan,8),TBs(2,npixel,nscan), ScanTime_swath(npixel,nscan), ScanTime(nscan))
+	Freq_GRPS=(/"S1","S2","S3","S4"/)
+	DO ig=1,4
+		Freq_GRP=Freq_GRPS(ig) 
+		CALL read_AMSR2_Vars(TB_FILENAME, Freq_GRP, TBs, Latitude, Longitude, ScanTime, nscan, npixel, nchannel,FYIO)	
+
+		IF (FYIO.NE.0) then 
+			deallocate(TB_swath, TBs, Latitude, Longitude, ScanTime,LZA_swath,ScanTime_swath)
+			goto 176
+		end if
+		do iff=1,2
+			TB_swath(:,:,(ig-1)*2+iff)=TBs(iff,:,:)
+		end do
+	END DO
+
+	DEALLOCATE(TBs)
 	
-	IF (FYIO.NE.0) then 
-		deallocate(TB_swath, Latitude, Longitude, ScanTime,LZA_swath,ScanTime_swath)
-		goto 176
-	end if
+	! stop
 	!! read global 0.01deg land sea mask: land 0% - 25% (strict land) - 75% (coastal) - 100% strict sea
 	!! longitude[3602] -0.05 ~ 360.05  ; latitude[1800]  -89.95 ~ 89.95
 	CALL read_land_sea_mask("subs/IMERG_land_sea_mask.nc",LSM_GRD)
@@ -374,7 +402,7 @@ PROGRAM main_clear_retrieve_landonly
 		lat=Latitude(ipixel,iscan)
 			
 		if (lon.le.-180.or.lon.ge.180) cycle 
-		if (lat.le.-90.or.lat.ge.90) cycle 
+		if (lat.le.-70.or.lat.ge.70) cycle 
 		if (ieee_is_nan(lat).or.ieee_is_nan(lon))cycle
 		
 		ilon=int((lon)/0.1)+1
@@ -495,7 +523,7 @@ PROGRAM main_clear_retrieve_landonly
 			goto 9642  !!! go to GOES-R or MSG or END
 		end if	
  
-		cltype=ctype(ilon-5:ilon+5,ilat-5:ilat+5)       
+		cltype=ctype(ilon-3:ilon+3,ilat-3:ilat+3)       
 
 		
 		!! cltype:  0=Clear, 1=Ci, 2=Cs, 3=Deep convection, 
@@ -505,21 +533,21 @@ PROGRAM main_clear_retrieve_landonly
 		!!   !! missing rate [primitive]: num(missing)/ngrid  
 		!!-------------------------------------------------------------------------------			
 		flag=1 			
-		Miss_swath(1,ipixel,iscan)= sum(flag, mask=cltype.gt.20.or.cltype.lt.0)/121.*100   !%
-		Miss_swath(2,ipixel,iscan)= sum(flag(3:8,3:8), &
-							mask=cltype(3:8,3:8).gt.20.or.cltype(3:8,3:8).lt.0)/36.*100   !%
+		Miss_swath(1,ipixel,iscan)= sum(flag, mask=cltype.gt.20.or.cltype.lt.0)/49.*100   !%
+		Miss_swath(2,ipixel,iscan)= sum(flag(2:6,2:6), &
+							mask=cltype(2:6,2:6).gt.20.or.cltype(2:6,2:6).lt.0)/25.*100   !%
 							
-		Miss_swath(3,ipixel,iscan)= sum(flag(5:6,5:6), &
-							mask=cltype(5:6,5:6).gt.20.or.cltype(5:6,5:6).lt.0)/4.*100   !%
+		Miss_swath(3,ipixel,iscan)= sum(flag(4:5,4:5), &
+							mask=cltype(4:5,4:5).gt.20.or.cltype(4:5,4:5).lt.0)/4.*100   !%
 
 		!!-------------------------------------------------------------------------------
 		!!   cloud fraction [primitive]:   num(cloud)/ngrid , 1-cltype=0:Clear - mising
 		!!   be more strict for Clear_swath=1-cloud
 		!!-------------------------------------------------------------------------------	
 		flag=1 
-		Clear_swath(1,ipixel,iscan)= sum(flag, mask=cltype.eq.0)/121.*100   !%
-		Clear_swath(2,ipixel,iscan)= sum(flag(3:8,3:8), mask=cltype(3:8,3:8).eq.0)/36.*100   !%
-		Clear_swath(3,ipixel,iscan)= sum(flag(5:6,5:6), mask=cltype(5:6,5:6).eq.0)/4.*100   !%
+		Clear_swath(1,ipixel,iscan)= sum(flag, mask=cltype.eq.0)/49.*100   !%
+		Clear_swath(2,ipixel,iscan)= sum(flag(2:6,2:6), mask=cltype(2:6,2:6).eq.0)/25.*100   !%
+		Clear_swath(3,ipixel,iscan)= sum(flag(4:5,4:5), mask=cltype(4:5,4:5).eq.0)/4.*100   !%
 		! if (cltype(3,3).eq.0) Clear_swath(3,ipixel,iscan)= 100.
 		
 		CFR_swath(:,ipixel,iscan)=100.-Clear_swath(:,ipixel,iscan)-Miss_swath(:,ipixel,iscan)
@@ -669,10 +697,10 @@ PROGRAM main_clear_retrieve_landonly
 		
 		
 !! 6.925 GHz
-		lonW=lon-0.25
-		lonE=lon+0.25
-		latN=lat+0.25
-		latS=lat-0.25
+		lonW=lon-0.15
+		lonE=lon+0.15
+		latN=lat+0.15
+		latS=lat-0.15
 		
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
@@ -717,10 +745,10 @@ PROGRAM main_clear_retrieve_landonly
 
 
 !!! 18.23.36 GHZ
-		lonW=lon-0.15
-		lonE=lon+0.15
-		latN=lat+0.15
-		latS=lat-0.15
+		lonW=lon-0.09
+		lonE=lon+0.09
+		latN=lat+0.09
+		latS=lat-0.09
 		
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
@@ -765,10 +793,10 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 
 !!! 89 GHZ
-		lonW=lon-0.08
-		lonE=lon+0.08
-		latN=lat+0.08
-		latS=lat-0.08
+		lonW=lon-0.045
+		lonE=lon+0.045
+		latN=lat+0.045
+		latS=lat-0.045
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
 		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
@@ -947,10 +975,10 @@ PROGRAM main_clear_retrieve_landonly
 
 		!!! ===============================================================================================================
 		!! 6.925 GHz ----------------------------------------------------------------------------------
-		lonW=lon-0.25
-		lonE=lon+0.25
-		latN=lat+0.25
-		latS=lat-0.25
+		lonW=lon-0.15
+		lonE=lon+0.15
+		latN=lat+0.15
+		latS=lat-0.15
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -989,10 +1017,10 @@ PROGRAM main_clear_retrieve_landonly
 
 		
 		!! 18.23.36 ----------------------------------------------------------------------------------
-		lonW=lon-0.15
-		lonE=lon+0.15
-		latN=lat+0.15
-		latS=lat-0.15
+		lonW=lon-0.09
+		lonE=lon+0.09
+		latN=lat+0.09
+		latS=lat-0.09
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -1029,10 +1057,10 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 
 		!! 89 ----------------------------------------------------------------------------------
-		lonW=lon-0.08
-		lonE=lon+0.08
-		latN=lat+0.08
-		latS=lat-0.08
+		lonW=lon-0.045
+		lonE=lon+0.045
+		latN=lat+0.045
+		latS=lat-0.045
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -1110,13 +1138,13 @@ PROGRAM main_clear_retrieve_landonly
 
 	ALLOCATE(Vapor_land(nlevel,num_land),AirTemp_land(nlevel,num_land))!,rh(nlevel,npixel,nscan)		
 
-	ALLOCATE(TB_land(nchannel,num_land))
+	ALLOCATE(TB_land(8,num_land))
 
 	ALLOCATE(Longitude_land(num_land),Latitude_land(num_land))
 	ALLOCATE(ScanTime_land(num_land),LZA_land(num_land),Sea_land(num_land),Cloudflg_land(num_land))
 	ALLOCATE(CFR_land(3,num_land),Clear_land(3,num_land),Miss_land(3,num_land))
 	
-	ALLOCATE(Emissivity_land(nchannel,num_land))
+	ALLOCATE(Emissivity_land(8,num_land))
 		Emissivity_land=0.0
 	
 	ERA5_HR1_STAMP="_"
@@ -1275,30 +1303,30 @@ PROGRAM main_clear_retrieve_landonly
 	write(samples,"(i0.7)") num_land
 	
 	print*, "├──RTTOV retrieve begining, total samples= "//samples
-	! channel 10.65 
-	print*, "├──── Start RTTOV retrieve Channel 1-2 ......."
+	! channel 10.65 , 10.65
+	print*, "├──── Start RTTOV retrieve Channel 3-4 ......."
 
-	call rttov_retrieve_mwri_emiss_clearsky(imonth,nlevel,num_land,2,53.1,(/1,2/),&
+	call rttov_retrieve_amsr_emiss_clearsky(imonth,nlevel,num_land,2,55,(/3,4/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
 			Vapor_land,AirTemp_land,&
 			LST_land,Psrf_land,T2m_land,SnowC_land,&
-			SMC_land,TB_land(1:2,:),Emissivity_land(1:2,:), FYSat) 
+			SMC_land,TB_land(1:2,:),Emissivity_land(1:2,:), SENSOR) 
 
-	! channel 18,18,23,36,36
-	print*, "├──── Start RTTOV retrieve Channel 3-8 ......."
-	call rttov_retrieve_mwri_emiss_clearsky(imonth,nlevel,num_land,6,53.1,(/3,4,5,6,7,8/),&
+	! channel 18,18,23,23
+	print*, "├──── Start RTTOV retrieve Channel 5-8 ......."
+	call rttov_retrieve_amsr_emiss_clearsky(imonth,nlevel,num_land,4,55,(/5,6,7,8/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
 			Vapor_land,AirTemp_land,&
 			LST_land,Psrf_land,T2m_land,SnowC_land,&
-			SMC_land,TB_land(3:8,:),Emissivity_land(3:8,:), FYSat) 
+			SMC_land,TB_land(3:6,:),Emissivity_land(3:6,:), SENSOR) 
 
-	! channel 89
+	! channel 36
 	print*, "├──── Start RTTOV retrieve Channel 9-10 ......."
-	call rttov_retrieve_mwri_emiss_clearsky(imonth,nlevel,num_land,2,53.1,(/9,10/),&
+	call rttov_retrieve_amsr_emiss_clearsky(imonth,nlevel,num_land,2,55,(/9,10/),&
 			Longitude_land,Latitude_land,PLEVEL,PHALF,&
 			Vapor_land,AirTemp_land,&
 			LST_land,Psrf_land,T2m_land,SnowC_land,&
-			SMC_land,TB_land(9:10,:),Emissivity_land(9:10,:), FYSat) 
+			SMC_land,TB_land(7:8,:),Emissivity_land(7:8,:), SENSOR) 
 
 	!! post-process
 	WHERE(Latitude_land.le.minval(elat).or.Latitude_land.ge.maxval(elat))
@@ -1310,8 +1338,8 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(6,:)=-999.9
 		Emissivity_land(7,:)=-999.9
 		Emissivity_land(8,:)=-999.9
-		Emissivity_land(9,:)=-999.9
-		Emissivity_land(10,:)=-999.9
+		! Emissivity_land(9,:)=-999.9
+		! Emissivity_land(10,:)=-999.9
 	ENDWHERE
 		
 	WHERE(LST_land.le.10 .or. LZA_land.lt.0)
@@ -1323,8 +1351,8 @@ PROGRAM main_clear_retrieve_landonly
 		Emissivity_land(6,:)=-999.9
 		Emissivity_land(7,:)=-999.9
 		Emissivity_land(8,:)=-999.9
-		Emissivity_land(9,:)=-999.9
-		Emissivity_land(10,:)=-999.9
+		! Emissivity_land(9,:)=-999.9
+		! Emissivity_land(10,:)=-999.9
 		LST_land=-999.9
 	ENDWHERE
 
@@ -1332,7 +1360,7 @@ PROGRAM main_clear_retrieve_landonly
 
 	!! reorgnize for HDF5 output
 	IF (HDF5) THEN
-		ALLOCATE(Emissivity_swath(nchannel,npixel,nscan))
+		ALLOCATE(Emissivity_swath(8,npixel,nscan))
 		Allocate(LST_swath(npixel,nscan),T2m_swath(npixel,nscan))
 		Allocate(SnowC_swath(npixel,nscan),SMC_swath(npixel,nscan))
 			LST_swath  = -999.9
@@ -1363,13 +1391,14 @@ PROGRAM main_clear_retrieve_landonly
 			Emissivity_swath(4,:,:)=-999.9
 			Emissivity_swath(5,:,:)=-999.9
 			Emissivity_swath(6,:,:)=-999.9
-			Emissivity_swath(7,:,:)=-999.9
-			Emissivity_swath(8,:,:)=-999.9
+
 		ENDWHERE
 		
 		WHERE(Miss_swath(3,:,:).ge.99)
-			Emissivity_swath(9,:,:)=-999.9
-			Emissivity_swath(10,:,:)=-999.9
+			Emissivity_swath(7,:,:)=-999.9
+			Emissivity_swath(8,:,:)=-999.9
+			! Emissivity_swath(9,:,:)=-999.9
+			! Emissivity_swath(10,:,:)=-999.9
 		ENDWHERE
 	END IF	
   ! --------------------------------------------------------------------------
@@ -1410,12 +1439,12 @@ PROGRAM main_clear_retrieve_landonly
 	
 	END DO	
 	PRINT*,"└── Output retrieval: "//trim(adjustL(EMISS_TEXT))
-505 format(4I6, 3f10.4, 20f10.4, 5f10.4, 10f10.4, I6)
+505 format(4I6, 3f10.4, 16f10.4, 5f10.4, 10f10.4, I6)
 	
 	close(text_unit)
 	
 	IF (HDF5) THEN
-		CALL write_emiss_hdf5(trim(adjustL(EMISS_HDF5)),nchannel,npixel,nscan, &
+		CALL write_emiss_hdf5(trim(adjustL(EMISS_HDF5)),8,npixel,nscan, &
 				Longitude,Latitude,ScanTime_swath,TB_swath,Emissivity_swath,&
 				LST_swath,T2m_swath,SnowC_swath,SMC_swath, &
 				LZA_swath,CFR_swath,Clear_swath,&
@@ -1461,7 +1490,7 @@ PROGRAM main_clear_retrieve_landonly
 	
 886 continue
 
-	PRINT*, "|| "//FYSat//"_L1C process done - "//yyyymmdd	
+	PRINT*, "|| "//SENSOR//"_L1C process done - "//yyyymmdd	
 	! Close the filelist
 	CLOSE(file_unit)
 	
