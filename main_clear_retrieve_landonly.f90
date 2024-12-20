@@ -225,9 +225,9 @@ PROGRAM main_clear_retrieve_landonly
 	
 	!! Directory to save GMI_L1C HDF5 files 
 	L1C_DIR = '/nfs/nuke/jihenghu/GPM_L1C/amsr2/'    
-	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
-	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
-	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
+	HIMA_DIR = '/home/jihenghu/data00/AHI_L2/'    
+	GEOS_DIR = '/home/jihenghu/data00/GOESR_CLM/'  
+	MSG_DIR='/home/jihenghu/data00/MSG_CLM/'
 
 	! ERA5_DIR = '/home/jihenghu/data00/ERA5/'
 	! ERA5_DIR = '/home/jihenghu/data04/ERA5/'
@@ -263,12 +263,22 @@ PROGRAM main_clear_retrieve_landonly
   
   IF (yyyymmdd>'20181231')  ERA5_DIR="/home/jihenghu/data05/ERA5_2019_2023/"
   IF (yyyymmdd<'20181232')  ERA5_DIR="/home/jihenghu/data04/ERA5/"
-    
+   
   ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
   ! CALL system("mkdir -p  "//trim(ERA5_DIR)) 
 
+   IF (yyyymmdd(1:4)>'2018') THEN
+	IF (yyyymmdd(5:8)>'0631') THEN
+		HIMA_DIR = '/data/jihenghu/tmp_data/AHI_L2/'    
+		MSG_DIR	 = '/data/jihenghu/tmp_data/MSG_CLM/'
+	END IF
+  END IF
   
-  
+  IF (yyyymmdd(1:4)>'2019') THEN
+	IF (yyyymmdd(5:8)>'0631') THEN
+		GEOS_DIR = '/data/jihenghu/tmp_data/GOESR_CLM/'  
+  	END IF
+  END IF
   
 ! ==================================================================================================
 ! 	Search FY3 Files
