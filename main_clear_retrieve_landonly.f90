@@ -213,7 +213,7 @@ PROGRAM main_clear_retrieve_landonly
 
 ! ==================================================================================================
 	
-	REDO=.False.  ! .True.!! redo retrieve or not?
+	REDO=.True.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	
 	useERA5=.True. ! True : use exist, dont download 
@@ -240,30 +240,36 @@ PROGRAM main_clear_retrieve_landonly
 	FYSat="FY3D"
 	
 	!! Directory to save GMI_L1C HDF5 files 
-	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/descend/'    
-	HIMA_DIR = '/home/jihenghu/data04/AHI_L2/'    
-	GEOS_DIR = '/home/jihenghu/data04/GOESR_CLM/'  
-	MSG_DIR='/home/jihenghu/data04/MSG_CLM/'
+	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/ascend/'    
+	HIMA_DIR = '/home/jihenghu/data00/AHI_L2/'    
+	GEOS_DIR = '/home/jihenghu/data00/GOESR_CLM/'  
+	MSG_DIR='/home/jihenghu/data00/MSG_CLM/'
 	
 	!! OUTPUTs 
     EMISS_OUTDIR = '/home/jihenghu/data05/'//FYSat//'_EMISSIVITY/'    
 
-	ERA5_DIR = '/home/jihenghu/data00/ERA5/'
+	! ERA5_DIR = '/home/jihenghu/data00/ERA5/'
 
-  ! IF (yyyymmdd(1:4)<'2019') ERA5_DIR = '/home/jihenghu/data00/ERA5/'
+  IF (yyyymmdd>'20181231')  ERA5_DIR="/home/jihenghu/data05/ERA5_2019_2023/"
+  IF (yyyymmdd<'20181232')  ERA5_DIR="/home/jihenghu/data04/ERA5/"
+   
+
   IF (yyyymmdd(1:4)>'2018') THEN
-	IF (yyyymmdd(5:8)<'0701') ERA5_DIR = '/home/jihenghu/data04/ERA5/'
 	IF (yyyymmdd(5:8)>'0631') THEN
-		ERA5_DIR = '/data/jihenghu/tmp_data/ERA5/'
 		HIMA_DIR = '/data/jihenghu/tmp_data/AHI_L2/'    
-		GEOS_DIR = '/data/jihenghu/tmp_data/GOESR_CLM/'  
 		MSG_DIR	 = '/data/jihenghu/tmp_data/MSG_CLM/'
 	END IF
   END IF
   
-    
+  IF (yyyymmdd(1:4)>'2019') THEN
+	IF (yyyymmdd(5:8)>'0631') THEN
+		GEOS_DIR = '/data/jihenghu/tmp_data/GOESR_CLM/'  
+  	END IF
+  END IF
+  
   
   ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
+      
   CALL system("mkdir -p  "//trim(ERA5_DIR)) 
   
   CALL system("mkdir  filelists")  
