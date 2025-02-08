@@ -206,28 +206,9 @@ PROGRAM main_clear_retrieve_landonly
 
   Integer :: num_land,iland
   
-  logical :: REDO, HDF5
-! ==================================================================================================
-!	 1. SET UP VARIABLES
-! ==================================================================================================	 
-	
-	!! Directory to save GMI_L1C HDF5 files
-	! GMIL1C_DIR = '/home/jihenghu/data00/data/GMI_L1C/'    
-	GMIL1C_DIR = '/nfs/nuke/jihenghu/GPM_L1C/gmi/'    
-	HIMA_DIR = '/home/jihenghu/data00/data/AHI_L2/'    
-	GEOS_DIR = '/home/jihenghu/data00/data/GOESR_CLM/'  
-	MSG_DIR='/home/jihenghu/data00/data/MSG_CLM/'
-	ERA5_DIR = '/home/jihenghu/data00/data_em/ERA5/'
-	! ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
-    
-	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data00/data_em/GMI_EMISSIVITY/'    
-	
-	REDO=.False.  ! .True.!! redo retrieve or not?
-	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
-	
-! ==================================================================================================
-
+  logical :: REDO, HDF5,useERA5,ERA5land_Batchdownload
+  
+  
   ! Check if a command-line argument is provided
   IF (COMMAND_ARGUMENT_COUNT() /= 1) THEN
     WRITE(*,*) 'Error: Please provide a date string (YYYYMMDD) as a command-line argument.'
@@ -237,15 +218,44 @@ PROGRAM main_clear_retrieve_landonly
   ! Get the date string from the command-line argument
   CALL GETARG(1, yyyymmdd)
   IF (yyyymmdd<'20140407') THEN
-    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.04.07.'
+    WRITE(*,*) 'Error: Please provide YYYYMMDD >= 2014.01.01.'
     STOP
   END IF  
   
+  
+! ==================================================================================================
+!	 1. SET UP VARIABLES
+! ==================================================================================================	 
+	
+	!! Directory to save GMI_L1C HDF5 files
+	GMIL1C_DIR 	= '/nfs/nuke/jihenghu/GPM_L1C/gmi/'    
+	
+	HIMA_DIR 	= '/data/jihenghu/tmp_data/AHI_L2/'    
+	GEOS_DIR 	= '/home/jihenghu/data04/GOESR_CLM/'  
+	MSG_DIR		= '/data/jihenghu/tmp_data/MSG_CLM/'
+	
+	!! ERA5 dir
+	ERA5_DIR = '/data/jihenghu/tmp_data/ERA5/'
+	IF (yyyymmdd(1:4)=='2018') ERA5_DIR = '/nfs/nuke/jihenghu/ERA5_tmp/'
+	IF (yyyymmdd(1:4)<'2018') ERA5_DIR  = '/home/jihenghu/data00/data_em/ERA5/'
+
+	!! OUTPUTs 
+    EMISS_OUTDIR = '/home/jihenghu/data05/gmi_emissivity/'    
+	
+	!! Controller
+	REDO=.True.  ! .True.!! redo retrieve or not?
+	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
+	useERA5=.False. ! True : use exist, dont download 
+	
+	ERA5land_Batchdownload=.True. !! directly download ERA5-land for 24 hours, and split
+! ==================================================================================================
+
   CALL system("mkdir  filelists")  
   CALL system("mkdir  logs") 
   
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR))  
   CALL system("mkdir -p  "//trim(EMISS_OUTDIR)//"/"//yyyymmdd(1:4)//'/'//yyyymmdd)
+   
   ERA5_DIR=trim(ERA5_DIR)//"/"//yyyymmdd(1:4)//'/'
   CALL system("mkdir -p  "//trim(ERA5_DIR)) 
   
@@ -284,6 +294,10 @@ PROGRAM main_clear_retrieve_landonly
 		GOTO 176
 	END IF
 	
+	IF (ERA5land_Batchdownload) THEN
+	 call system("python3 subs/era5/download_era5_lands_batch.py "//yyyymmdd//" "//trim(ERA5_DIR)) 
+	END IF
+
    !! --------------------------------------------------------------------------------------------------
    !!		  read GMI Variables                   
    !! --------------------------------------------------------------------------------------------------	
@@ -635,10 +649,10 @@ PROGRAM main_clear_retrieve_landonly
 		
 		
 !! 6.925 GHz
-		lonW=lon-0.25
-		lonE=lon+0.25
-		latN=lat+0.25
-		latS=lat-0.25
+		lonW=lon-0.125
+		lonE=lon+0.125
+		latN=lat+0.125
+		latS=lat-0.125
 		
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
@@ -683,10 +697,10 @@ PROGRAM main_clear_retrieve_landonly
 
 
 !!! 18.23.36 GHZ
-		lonW=lon-0.15
-		lonE=lon+0.15
-		latN=lat+0.15
-		latS=lat-0.15
+		lonW=lon-0.06
+		lonE=lon+0.06
+		latN=lat+0.06
+		latS=lat-0.06
 		
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
@@ -731,10 +745,10 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 
 !!! 89 GHZ
-		lonW=lon-0.08
-		lonE=lon+0.08
-		latN=lat+0.08
-		latS=lat-0.08
+		lonW=lon-0.03
+		lonE=lon+0.03
+		latN=lat+0.03
+		latS=lat-0.03
 		CALL get_SZA_GOESR_LonLat(lambda16,lonW,lat,Wf,x0,FLAG1)
 		CALL get_SZA_GOESR_LonLat(lambda16,lonE,lat,Ef,x0,FLAG2)
 		CALL get_SZA_GOESR_LonLat(lambda16,lon,latN,x0,Nf,FLAG3)
@@ -913,10 +927,10 @@ PROGRAM main_clear_retrieve_landonly
 
 		!!! ===============================================================================================================
 		!! 6.925 GHz ----------------------------------------------------------------------------------
-		lonW=lon-0.25
-		lonE=lon+0.25
-		latN=lat+0.25
-		latS=lat-0.25
+		lonW=lon-0.125
+		lonE=lon+0.125
+		latN=lat+0.125
+		latS=lat-0.125
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -954,10 +968,10 @@ PROGRAM main_clear_retrieve_landonly
 
 		
 		!! 18.23.36 ----------------------------------------------------------------------------------
-		lonW=lon-0.15
-		lonE=lon+0.15
-		latN=lat+0.15
-		latS=lat-0.15
+		lonW=lon-0.06
+		lonE=lon+0.06
+		latN=lat+0.06
+		latS=lat-0.06
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -993,10 +1007,10 @@ PROGRAM main_clear_retrieve_landonly
 		ENDIF
 
 		!! 89 ----------------------------------------------------------------------------------
-		lonW=lon-0.08
-		lonE=lon+0.08
-		latN=lat+0.08
-		latS=lat-0.08
+		lonW=lon-0.03
+		lonE=lon+0.03
+		latN=lat+0.03
+		latS=lat-0.03
 		
 		CALL geocoord2pixcoord(lat,lonW,Lambda0, W,dum,FLAG1)   !! E<W
 		CALL geocoord2pixcoord(lat,lonE,Lambda0, E,dum,FLAG2)
@@ -1135,7 +1149,8 @@ PROGRAM main_clear_retrieve_landonly
 					
 				inquire(file=trim(adjustl(req_era5_hr1)), exist=alive1)
 				inquire(file=trim(adjustl(req_land_hr1)), exist=alive2)
-
+				
+				IF (((.not.alive1).or.(.not.alive2)).and. useERA5) goto 1505
 
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
@@ -1171,7 +1186,9 @@ PROGRAM main_clear_retrieve_landonly
 					
 				inquire(file=trim(adjustl(req_era5_hr2)), exist=alive1)
 				inquire(file=trim(adjustl(req_land_hr2)), exist=alive2)
-
+				
+				IF (((.not.alive1).or.(.not.alive2)).and. useERA5) goto 1505
+				
 				if (.not.alive1) then 
 					print*, "│  │  ├── ERA5-Plevel file Not Found, calling Python downloading script....."
 					call system("python3 subs/era5/download_era5_profiles.py "//&
