@@ -240,7 +240,7 @@ PROGRAM main_clear_retrieve_landonly
 	FYSat="FY3D"
 	
 	!! Directory to save GMI_L1C HDF5 files 
-	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/ascend/'    
+	L1C_DIR = '/home/jihenghu/fy03/'//FYSat//'/descend/'    
 	HIMA_DIR = '/home/jihenghu/data00/AHI_L2/'    
 	GEOS_DIR = '/home/jihenghu/data00/GOESR_CLM/'  
 	MSG_DIR='/home/jihenghu/data00/MSG_CLM/'
