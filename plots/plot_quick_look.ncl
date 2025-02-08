@@ -2,9 +2,9 @@ begin
 ; file_name="Emissivity.Clear.GMI.Himawari8.GOESR.MSGIO.20150802-S000207-E013440.txt"
 
 ; yyyymmdd=20170301
-path="/home/jihenghu/data05/FY3B_EMISSIVITY/"+sprinti("%0.4i",yyyymmdd/10000)+"/"+yyyymmdd+"/"
+path="/home/jihenghu/data05/FY3C_EMISSIVITY/"+sprinti("%0.4i",yyyymmdd/10000)+"/"+yyyymmdd+"/"
 
-fillist=systemfunc("cd "+path+" ; ls Emissivity.Clear.FY3B.*.txt")
+fillist=systemfunc("cd "+path+" ; ls Emissivity.Clear.FY3C.*.txt")
 
 nrows=0
 ncols=0
