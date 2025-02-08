@@ -231,7 +231,7 @@ PROGRAM main_clear_retrieve_landonly
 	GMIL1C_DIR 	= '/nfs/nuke/jihenghu/GPM_L1C/gmi/'    
 	
 	HIMA_DIR 	= '/data/jihenghu/tmp_data/AHI_L2/'    
-	GEOS_DIR 	= '/data/jihenghu/tmp_data/GOESR_CLM/'  
+	GEOS_DIR 	= '/home/jihenghu/data04/GOESR_CLM/'  
 	MSG_DIR		= '/data/jihenghu/tmp_data/MSG_CLM/'
 	
 	!! ERA5 dir
@@ -240,10 +240,10 @@ PROGRAM main_clear_retrieve_landonly
 	IF (yyyymmdd(1:4)<'2018') ERA5_DIR  = '/home/jihenghu/data00/data_em/ERA5/'
 
 	!! OUTPUTs 
-    EMISS_OUTDIR = '/home/jihenghu/data04/gmi_emissivity/'    
+    EMISS_OUTDIR = '/home/jihenghu/data05/gmi_emissivity/'    
 	
 	!! Controller
-	REDO=.False.  ! .True.!! redo retrieve or not?
+	REDO=.True.  ! .True.!! redo retrieve or not?
 	HDF5=.False.  ! .True.!! Output HDF orbits? Ascii format is mandatory
 	useERA5=.False. ! True : use exist, dont download 
 	
